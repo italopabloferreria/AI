@@ -45,6 +45,15 @@ export interface IDigitalCheckRepository {
   }>;
 }
 
+// Carrega variáveis de .env.local nativamente se disponível no Node.js
+if (typeof process !== 'undefined' && typeof process.loadEnvFile === 'function') {
+  try {
+    process.loadEnvFile('.env.local');
+  } catch {
+    // .env.local pode não existir em produção
+  }
+}
+
 // -------------------------------------------------------------
 // CONFIGURAÇÃO DO POOL POSTGRESQL (ITEM 14 E ITEM 15)
 // -------------------------------------------------------------
@@ -55,27 +64,39 @@ function createPostgresPool(connectionString: string): pg.Pool {
   if (process.env.DATABASE_SSL === 'false' || process.env.DATABASE_SSL === '0') {
     sslConfig = false;
   } else if (process.env.DATABASE_SSL === 'true' || process.env.DATABASE_SSL === '1') {
-    const allowInsecure = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === 'false';
-    sslConfig = allowInsecure ? { rejectUnauthorized: false } : true;
+    const rejectUnauth = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === 'true';
+    sslConfig = rejectUnauth ? true : { rejectUnauthorized: false };
   } else {
     // Detecção automática segura: desliga em localhost, ativa em provedores remotos
     const isLocalhost = connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
     if (isLocalhost) {
       sslConfig = false;
     } else {
-      // Provedores como Neon, Supabase, RDS requerem SSL. Se o certificado for autoassinado, DATABASE_SSL_REJECT_UNAUTHORIZED pode ser 'false'.
-      const allowInsecure = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === 'false';
-      sslConfig = allowInsecure ? { rejectUnauthorized: false } : true;
+      // Provedores como Neon, Supabase requerem SSL. Para certificados de poolers remotos, permitimos por padrão rejectUnauthorized: false
+      const rejectUnauth = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === 'true';
+      sslConfig = rejectUnauth ? true : { rejectUnauthorized: false };
     }
   }
 
-  return new pg.Pool({
-    connectionString,
+  // Remove sslmode da URL para que pg-connection-string não force verify-full sobrescrevendo o sslConfig
+  const cleanConnectionString = connectionString.replace(/([?&])sslmode=[^&]+(&|$)/, (_, prefix, suffix) => {
+    return prefix === '?' && suffix ? '?' : '';
+  }).replace(/\?$/, '');
+
+  const pool = new pg.Pool({
+    connectionString: cleanConnectionString,
     ssl: sslConfig,
     max: 5,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
   });
+
+  pool.on('error', (err) => {
+    // eslint-disable-next-line no-console
+    console.error('[Postgres Pool Error]:', err.message);
+  });
+
+  return pool;
 }
 
 // -------------------------------------------------------------

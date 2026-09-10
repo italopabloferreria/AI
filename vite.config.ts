@@ -46,6 +46,9 @@ export default defineConfig(async () => {
 
   return {
     css: { postcss: { plugins: [tailwindcss()] } },
+    ssr: {
+      external: ['pg'],
+    },
     server: {
       watch: {
         ignored: ['**/*.mp4', '**/*.jpeg', '**/*.png', '**/.git/**', '**/*.zip'],
@@ -56,10 +59,14 @@ export default defineConfig(async () => {
     plugins: [
       vinext(),
       sites(),
-      cloudflare({
-        viteEnvironment: { name: 'rsc', childEnvironments: ['ssr'] },
-        config: localBindingConfig,
-      }),
+      ...(d1 || r2
+        ? [
+            cloudflare({
+              viteEnvironment: { name: 'rsc', childEnvironments: ['ssr'] },
+              config: localBindingConfig,
+            }),
+          ]
+        : []),
     ],
   };
 });
