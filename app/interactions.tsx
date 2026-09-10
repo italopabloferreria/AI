@@ -4,6 +4,149 @@ import {useEffect,useState} from 'react';
 import {Checkbox} from '@/components/ui/checkbox';
 import {config} from './site.config';
 export function Enhancements(){const [open,setOpen]=useState(false);useEffect(()=>{const observer=new IntersectionObserver(entries=>entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('seen');observer.unobserve(e.target)}}),{threshold:.06});document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));return()=>observer.disconnect()},[]);return <div className="mobile-menu"><button aria-expanded={open} aria-controls="mobile-nav" onClick={()=>setOpen(!open)}>{open?'Fechar ×':'Menu +'}</button>{open&&<nav id="mobile-nav" aria-label="Navegação móvel">{config.nav.map(([label,id])=><a key={id} href={'#'+id} onClick={()=>setOpen(false)}>{label} <ArrowIcon /></a>)}</nav>}</div>}
-export function Briefing(){const [consent,setConsent]=useState(false);const [result,setResult]=useState('');const [error,setError]=useState('');const [copied,setCopied]=useState(false);const [channel,setChannel]=useState('');function submit(e:React.FormEvent<HTMLFormElement>){e.preventDefault();setError('');setResult('');setCopied(false);const data=new FormData(e.currentTarget);const name=String(data.get('name')||'').trim(),company=String(data.get('company')||'').trim(),email=String(data.get('email')||'').trim(),message=String(data.get('message')||'').trim();if(name.length<2||company.length<2||message.length<10||!consent){setError('Preencha nome e empresa, descreva seu desafio em pelo menos 10 caracteres e autorize o contato.');return}const text=`!AI Digital Check\nNome: ${name}\nEmpresa: ${company}\nE-mail: ${email}\nSite: ${String(data.get('website')||'Não informado')}\nDesafio: ${message}\nAutorizou contato para este diagnóstico.`;setResult(text);setChannel(config.contact.whatsapp?'whatsapp':config.contact.email?'email':'download')}
-function download(){const url=URL.createObjectURL(new Blob([result],{type:'text/plain;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='meu-digital-check.txt';a.click();URL.revokeObjectURL(url)}
-return <form onSubmit={submit} className="briefing"><div className="form-grid"><label>Seu nome<input name="name" autoComplete="name" required minLength={2} maxLength={120} placeholder="Como podemos chamar você?"/></label><label>Empresa<input name="company" autoComplete="organization" required minLength={2} maxLength={160} placeholder="Nome do seu negócio"/></label><label>E-mail profissional<input name="email" autoComplete="email" type="email" required maxLength={254} placeholder="voce@empresa.com.br"/></label><label>Site ou Instagram <small>(opcional)</small><input name="website" maxLength={250} placeholder="Onde encontramos sua empresa?"/></label></div><label>O que está tomando seu tempo?<textarea name="message" required minLength={10} maxLength={2500} rows={4} placeholder="Conte sobre a tarefa, processo ou projeto que você quer melhorar."/></label><label className="consent"><Checkbox checked={consent} onCheckedChange={v=>setConsent(v===true)} aria-label="Autorizo contato sobre meu diagnóstico"/><span>Autorizo o contato sobre meu diagnóstico e li as informações de <a href="#privacidade">privacidade</a>.</span></label><p className="form-error" role="alert">{error}</p><button className="button" type="submit">Preparar meu Digital Check <ArrowIcon /></button><p className="fine">Gratuito. Sem compromisso. Uma boa conversa antes de qualquer proposta.</p>{result&&<div className="result" role="status"><h3>Seu briefing está pronto.</h3>{channel==='download'?<p>Esta beta ainda não tem um canal de recebimento configurado. Baixe seu briefing para compartilhar com a equipe. Nada foi enviado.</p>:<p>Continue abaixo para revisar e enviar pelo seu aplicativo. O envio só acontece quando você confirmar por lá.</p>}<div className="actions">{channel==='whatsapp'&&<a className="button" target="_blank" rel="noopener noreferrer" href={'https://wa.me/'+config.contact.whatsapp.replace(/\D/g,'')+'?text='+encodeURIComponent(result)}>Enviar pelo WhatsApp <ArrowIcon /></a>}{channel==='email'&&<a className="button" href={'mailto:'+config.contact.email+'?subject='+encodeURIComponent('Meu !AI Digital Check')+'&body='+encodeURIComponent(result)}>Enviar por e-mail <ArrowIcon /></a>}<button className="button outline" type="button" onClick={download}>Baixar briefing <ArrowIcon direction="down" /></button><button className="text-button" type="button" onClick={async()=>{try{await navigator.clipboard.writeText(result);setCopied(true)}catch{setError('Não foi possível copiar. Use Baixar briefing.')}}}>{copied?'Copiado ✓':'Copiar texto'}</button></div></div>}</form>}
+export function Briefing({ onStartCheck }: { onStartCheck?: (checkId: string, token: string, lead: { name: string; company: string; websiteOrInstagram?: string }) => void }) {
+  const [consent, setConsent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError('');
+
+    const form = e.currentTarget;
+    const data = new FormData(form);
+
+    // Honeypot check
+    const hp = String(data.get('company_hp') || '');
+    if (hp) {
+      setError('Submissão inválida.');
+      return;
+    }
+
+    const name = String(data.get('name') || '').trim();
+    const company = String(data.get('company') || '').trim();
+    const email = String(data.get('email') || '').trim();
+    const website = String(data.get('website') || '').trim();
+    const message = String(data.get('message') || '').trim();
+
+    if (name.length < 2 || company.length < 2 || message.length < 10 || !consent) {
+      setError('Preencha nome e empresa, descreva seu desafio em pelo menos 10 caracteres e autorize o tratamento dos dados.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // 1. Salvar lead no backend antes de iniciar o questionário
+      const leadRes = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          company,
+          email,
+          website,
+          message,
+          consent: true,
+        }),
+      });
+
+      if (!leadRes.ok) {
+        const errData = ((await leadRes.json().catch(() => ({}))) || {}) as Record<string, any>;
+        throw new Error(errData.error || 'Não conseguimos salvar seu Digital Check. Tente novamente.');
+      }
+
+      const { leadId } = (await leadRes.json()) as { leadId: string };
+
+      // 2. Criar sessão de Digital Check com resume token seguro
+      const checkRes = await fetch('/api/digital-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId,
+          leadData: { name, company, email, website, message },
+        }),
+      });
+
+      if (!checkRes.ok) {
+        const errData = ((await checkRes.json().catch(() => ({}))) || {}) as Record<string, any>;
+        throw new Error(errData.error || 'Falha ao iniciar a sessão do Digital Check.');
+      }
+
+      const { digitalCheckId, resumeToken } = (await checkRes.json()) as { digitalCheckId: string; resumeToken: string };
+
+      // 3. Salvar temporariamente na sessionStorage para tolerância a refresh
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('ai_dc_id', digitalCheckId);
+        sessionStorage.setItem('ai_dc_token', resumeToken);
+      }
+
+      // 4. Transição fluida para o fluxo de diagnóstico
+      if (onStartCheck) {
+        onStartCheck(digitalCheckId, resumeToken, { name, company, websiteOrInstagram: website });
+      } else if (typeof window !== 'undefined') {
+        window.location.assign('/digital-check');
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Não conseguimos salvar seu Digital Check. Tente novamente.';
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="briefing">
+      {/* Honeypot invisível para proteção contra bots */}
+      <div style={{ display: 'none' }} aria-hidden="true">
+        <input name="company_hp" tabIndex={-1} autoComplete="off" />
+      </div>
+
+      <div className="form-grid">
+        <label>
+          Seu nome
+          <input name="name" autoComplete="name" required minLength={2} maxLength={120} placeholder="Como podemos chamar você?" />
+        </label>
+        <label>
+          Empresa
+          <input name="company" autoComplete="organization" required minLength={2} maxLength={160} placeholder="Nome do seu negócio" />
+        </label>
+        <label>
+          E-mail profissional
+          <input name="email" autoComplete="email" type="email" required maxLength={254} placeholder="voce@empresa.com.br" />
+        </label>
+        <label>
+          Site ou Instagram <small>(opcional)</small>
+          <input name="website" maxLength={250} placeholder="Onde encontramos sua empresa?" />
+        </label>
+      </div>
+
+      <label>
+        O que está tomando seu tempo?
+        <textarea name="message" required minLength={10} maxLength={2500} rows={4} placeholder="Conte sobre a tarefa, processo ou projeto que você quer melhorar." />
+      </label>
+
+      <p className="fine" style={{ margin: '8px 0 16px', color: 'var(--muted)' }}>
+        Usamos as informações enviadas para preparar seu Digital Check e entrar em contato sobre o diagnóstico. Não envie senhas, dados médicos ou outras informações sensíveis.
+      </p>
+
+      <label className="consent">
+        <Checkbox checked={consent} onCheckedChange={(v) => setConsent(v === true)} aria-label="Autorizo o tratamento das informações para meu diagnóstico" />
+        <span>
+          Autorizo o tratamento das informações enviadas para preparação do meu Digital Check e contato sobre o diagnóstico. Li a <a href="#privacidade">Política de Privacidade</a>.
+        </span>
+      </label>
+
+      {error && <p className="form-error" role="alert">{error}</p>}
+
+      <button className="button" type="submit" disabled={loading}>
+        {loading ? 'Salvando...' : 'Preparar meu Digital Check'} <ArrowIcon />
+      </button>
+
+      <p className="fine">
+        Gratuito. Sem compromisso. Uma boa conversa antes de qualquer proposta.
+      </p>
+    </form>
+  );
+}
+
