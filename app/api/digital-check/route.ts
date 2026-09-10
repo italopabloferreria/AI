@@ -20,6 +20,7 @@ export async function POST(request: Request) {
         name: String(body.leadData.name || 'Lead').trim(),
         company: String(body.leadData.company || 'Empresa').trim(),
         email: String(body.leadData.email || '').trim(),
+        whatsapp: String(body.leadData.whatsapp || body.leadData.phone || '').trim(),
         websiteOrInstagram: body.leadData.website ? String(body.leadData.website).trim() : undefined,
         initialProblem: String(body.leadData.message || body.leadData.initialProblem || 'Diagnóstico').trim(),
         consent: true,

@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS leads (
     name VARCHAR(120) NOT NULL,
     company VARCHAR(160) NOT NULL,
     email VARCHAR(254) NOT NULL,
+    whatsapp VARCHAR(30) NOT NULL,
     website_or_instagram VARCHAR(250),
     initial_problem TEXT NOT NULL,
     consent BOOLEAN NOT NULL DEFAULT true,
@@ -21,6 +22,9 @@ CREATE TABLE IF NOT EXISTS leads (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Garantir coluna whatsapp em bancos existentes
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS whatsapp VARCHAR(30);
 
 CREATE INDEX IF NOT EXISTS idx_leads_email ON leads(email);
 CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads(created_at);

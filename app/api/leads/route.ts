@@ -24,6 +24,7 @@ export async function POST(request: Request) {
     const name = sanitizeString(body.name, 120);
     const company = sanitizeString(body.company, 160);
     const email = sanitizeString(body.email, 254).toLowerCase();
+    const whatsapp = sanitizeString(body.whatsapp || body.phone, 30);
     const websiteOrInstagram = sanitizeString(body.website || body.websiteOrInstagram, 250);
     const initialProblem = sanitizeString(body.message || body.initialProblem, 2500);
     const consent = Boolean(body.consent);
@@ -36,6 +37,10 @@ export async function POST(request: Request) {
     }
     if (!isValidEmail(email)) {
       return NextResponse.json({ error: 'Informe um endereço de e-mail válido.' }, { status: 400 });
+    }
+    const cleanPhone = whatsapp.replace(/\D/g, '');
+    if (cleanPhone.length < 10) {
+      return NextResponse.json({ error: 'Informe um número de WhatsApp válido com DDD.' }, { status: 400 });
     }
     if (initialProblem.length < 10) {
       return NextResponse.json(
@@ -57,6 +62,7 @@ export async function POST(request: Request) {
       name,
       company,
       email,
+      whatsapp,
       websiteOrInstagram: websiteOrInstagram || undefined,
       initialProblem,
       consent: true,

@@ -26,11 +26,13 @@ export function Briefing({ onStartCheck }: { onStartCheck?: (checkId: string, to
     const name = String(data.get('name') || '').trim();
     const company = String(data.get('company') || '').trim();
     const email = String(data.get('email') || '').trim();
+    const whatsapp = String(data.get('whatsapp') || '').trim();
     const website = String(data.get('website') || '').trim();
     const message = String(data.get('message') || '').trim();
 
-    if (name.length < 2 || company.length < 2 || message.length < 10 || !consent) {
-      setError('Preencha nome e empresa, descreva seu desafio em pelo menos 10 caracteres e autorize o tratamento dos dados.');
+    const cleanPhone = whatsapp.replace(/\D/g, '');
+    if (name.length < 2 || company.length < 2 || message.length < 10 || cleanPhone.length < 10 || !consent) {
+      setError('Preencha nome, empresa, WhatsApp válido (com DDD), desafio (mínimo 10 caracteres) e autorize o tratamento dos dados.');
       return;
     }
 
@@ -45,6 +47,7 @@ export function Briefing({ onStartCheck }: { onStartCheck?: (checkId: string, to
           name,
           company,
           email,
+          whatsapp,
           website,
           message,
           consent: true,
@@ -64,7 +67,7 @@ export function Briefing({ onStartCheck }: { onStartCheck?: (checkId: string, to
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           leadId,
-          leadData: { name, company, email, website, message },
+          leadData: { name, company, email, whatsapp, website, message },
         }),
       });
 
@@ -116,8 +119,12 @@ export function Briefing({ onStartCheck }: { onStartCheck?: (checkId: string, to
           <input name="email" autoComplete="email" type="email" required maxLength={254} placeholder="voce@empresa.com.br" />
         </label>
         <label>
+          WhatsApp <small>(com DDD)</small>
+          <input name="whatsapp" autoComplete="tel" type="tel" required maxLength={25} placeholder="(11) 99999-9999" />
+        </label>
+        <label style={{ gridColumn: '1 / -1' }}>
           Site ou Instagram <small>(opcional)</small>
-          <input name="website" maxLength={250} placeholder="Onde encontramos sua empresa?" />
+          <input name="website" maxLength={250} placeholder="Onde encontramos sua empresa na internet?" />
         </label>
       </div>
 

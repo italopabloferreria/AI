@@ -14,6 +14,7 @@ export interface IDigitalCheckRepository {
     name: string;
     company: string;
     email: string;
+    whatsapp: string;
     websiteOrInstagram?: string;
     initialProblem: string;
     consent: boolean;
@@ -44,6 +45,7 @@ class PostgresRepository implements IDigitalCheckRepository {
     name: string;
     company: string;
     email: string;
+    whatsapp: string;
     websiteOrInstagram?: string;
     initialProblem: string;
     consent: boolean;
@@ -51,9 +53,9 @@ class PostgresRepository implements IDigitalCheckRepository {
     privacyPolicyVersion: string;
   }): Promise<Lead> {
     const query = `
-      INSERT INTO leads (name, company, email, website_or_instagram, initial_problem, consent, consent_at, privacy_policy_version, status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'created')
-      RETURNING id, name, company, email, website_or_instagram as "websiteOrInstagram",
+      INSERT INTO leads (name, company, email, whatsapp, website_or_instagram, initial_problem, consent, consent_at, privacy_policy_version, status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'created')
+      RETURNING id, name, company, email, whatsapp, website_or_instagram as "websiteOrInstagram",
                 initial_problem as "initialProblem", consent, consent_at as "consentAt",
                 privacy_policy_version as "privacyPolicyVersion", source, status,
                 created_at as "createdAt", updated_at as "updatedAt"
@@ -62,6 +64,7 @@ class PostgresRepository implements IDigitalCheckRepository {
       data.name,
       data.company,
       data.email,
+      data.whatsapp,
       data.websiteOrInstagram || null,
       data.initialProblem,
       data.consent,
@@ -73,7 +76,7 @@ class PostgresRepository implements IDigitalCheckRepository {
 
   async getLead(id: string): Promise<Lead | null> {
     const query = `
-      SELECT id, name, company, email, website_or_instagram as "websiteOrInstagram",
+      SELECT id, name, company, email, whatsapp, website_or_instagram as "websiteOrInstagram",
              initial_problem as "initialProblem", consent, consent_at as "consentAt",
              privacy_policy_version as "privacyPolicyVersion", source, status,
              created_at as "createdAt", updated_at as "updatedAt"
@@ -218,6 +221,7 @@ class InMemoryRepository implements IDigitalCheckRepository {
     name: string;
     company: string;
     email: string;
+    whatsapp: string;
     websiteOrInstagram?: string;
     initialProblem: string;
     consent: boolean;

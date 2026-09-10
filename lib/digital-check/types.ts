@@ -9,6 +9,7 @@ export interface Lead {
   name: string;
   company: string;
   email: string;
+  whatsapp: string;
   websiteOrInstagram?: string;
   initialProblem: string;
   consent: boolean;
