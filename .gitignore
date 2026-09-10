@@ -17,6 +17,7 @@
 /out/
 
 # misc
+/hero-loop.mp4
 .DS_Store
 *.pem
 

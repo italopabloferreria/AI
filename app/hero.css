@@ -1,0 +1,23 @@
+.cinema-hero{position:relative;isolation:isolate;min-height:660px;height:min(780px,calc(100svh - 90px));background:#11100e;overflow:hidden;display:flex;align-items:center}
+.cinema-scene{position:absolute;inset:0;z-index:-2}
+.cinema-scene img,.cinema-scene video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center top;pointer-events:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+video::-webkit-media-controls,video::-webkit-media-controls-enclosure{display:none!important}
+.cinema-hero:after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(10,10,11,.72),rgba(10,10,11,.35) 32%,transparent 60%),linear-gradient(0deg,rgba(10,10,11,.6),transparent 25%);pointer-events:none}
+.cinema-copy{padding-block:65px 100px}
+.cinema-copy .eyebrow{font-size:11px;letter-spacing:1.4px;max-width:380px}
+.cinema-copy h1{font-size:clamp(42px,4.3vw,68px);font-weight:500;line-height:1.04;letter-spacing:-.055em;margin:30px 0 26px;max-width:540px}
+.cinema-copy h1 span{color:var(--lime)}
+.cinema-copy p{font-size:18px;line-height:1.55;color:#e0ded5;margin:0 0 28px}
+.cinema-controls{position:absolute;bottom:24px;left:50px;right:50px;display:flex;justify-content:space-between;align-items:center;gap:20px;font-size:12px}
+@media(max-width:1100px){.cinema-controls{left:28px;right:28px}.cinema-copy h1{font-size:clamp(42px,4.6vw,58px)}}
+@media(max-width:760px){
+ .cinema-hero{display:flex;flex-direction:column;align-items:stretch;height:auto;min-height:0;overflow:hidden;background:var(--carbon)}
+ .cinema-copy{order:0;padding:56px 0 28px}
+ .cinema-copy .eyebrow{max-width:240px;font-size:10px}
+ .cinema-copy h1{font-size:clamp(38px,8.8vw,60px);margin:24px 0 20px}
+ .cinema-copy p{font-size:16px;margin-bottom:22px}
+ .cinema-scene{order:1;position:relative;inset:auto;z-index:0;aspect-ratio:1.35;width:100%}
+ .cinema-scene img,.cinema-scene video{object-position:64% top}
+ .cinema-hero:after{display:none}
+ .cinema-controls{order:2;position:static;padding:14px 20px 20px;gap:12px;background:var(--carbon);font-size:11px}
+ }
