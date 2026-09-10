@@ -15,7 +15,8 @@ video::-webkit-media-controls,video::-webkit-media-controls-enclosure{display:no
  .cinema-copy{order:0;padding:56px 0 28px}
  .cinema-copy .eyebrow{max-width:240px;font-size:10px}
  .cinema-copy h1{font-size:clamp(38px,8.8vw,60px);margin:24px 0 20px}
- .cinema-copy p{font-size:16px;margin-bottom:22px}
+ .cinema-copy p{font-size:16px;margin-bottom:0}
+ .cinema-copy .button{display:none}
  .cinema-scene{order:1;position:relative;inset:auto;z-index:0;aspect-ratio:1.35;width:100%}
  .cinema-scene img,.cinema-scene video{object-position:64% top}
  .cinema-hero:after{display:none}
