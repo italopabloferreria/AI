@@ -1,1 +1,1 @@
-export { default, config } from './[...path].js';
+export { default, config } from './_bridge.js';

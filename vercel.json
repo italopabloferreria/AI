@@ -4,8 +4,28 @@
   "cleanUrls": true,
   "rewrites": [
     {
+      "source": "/api/digital-check/:id/answers",
+      "destination": "/api/_bridge?__route=/api/digital-check/:id/answers"
+    },
+    {
+      "source": "/api/digital-check/:id/complete",
+      "destination": "/api/_bridge?__route=/api/digital-check/:id/complete"
+    },
+    {
+      "source": "/api/digital-check/:id",
+      "destination": "/api/_bridge?__route=/api/digital-check/:id"
+    },
+    {
+      "source": "/api/digital-check",
+      "destination": "/api/_bridge?__route=/api/digital-check"
+    },
+    {
+      "source": "/api/leads",
+      "destination": "/api/_bridge?__route=/api/leads"
+    },
+    {
       "source": "/api/:path*",
-      "destination": "/api/:path*"
+      "destination": "/api/_bridge?__route=/api/:path*"
     },
     {
       "source": "/((?!api/).*)",
