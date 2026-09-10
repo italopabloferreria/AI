@@ -4,6 +4,18 @@ export type Priority = 'high' | 'medium' | 'low';
 
 export type DigitalCheckStatus = 'started' | 'in_progress' | 'completed';
 
+export type CanonicalQuestionKey =
+  | 'lead_sources'
+  | 'lead_handling'
+  | 'lead_organization'
+  | 'follow_up'
+  | 'manual_tasks'
+  | 'system_integration'
+  | 'website_function'
+  | 'ai_opportunity'
+  | 'main_bottleneck'
+  | 'urgency';
+
 export interface Lead {
   id: string;
   name: string;
@@ -26,7 +38,7 @@ export interface DigitalCheck {
   leadId: string;
   resumeTokenHash: string;
   status: DigitalCheckStatus;
-  currentStep: number;
+  currentStep: number; // 1 a 10
   score?: number;
   primaryOpportunity?: Category;
   startedAt: string;
@@ -49,6 +61,7 @@ export interface DigitalCheckAnswer {
 export interface DigitalCheckRecommendation {
   id?: string;
   digitalCheckId: string;
+  recommendationKey: string;
   category: Category;
   priority: Priority;
   title: string;
@@ -66,8 +79,11 @@ export interface QuestionOption {
 }
 
 export interface QuestionDefinition {
-  key: string;
-  step: number; // 1 to 10
+  id: number;
+  step: number; // 1 a 10
+  stepNumberStr: string; // '01 / 10' a '10 / 10'
+  eyebrow: string;
+  key: CanonicalQuestionKey;
   type: 'single' | 'multiple' | 'textarea' | 'scale';
   question: string;
   description?: string;

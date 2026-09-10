@@ -53,6 +53,7 @@ export function runDiagnosticEngine(
     const nexMotto = leadOrg === 'memory' ? ' (e memória não é CRM).' : '.';
     recommendations.push({
       digitalCheckId,
+      recommendationKey: 'org_centralized',
       category: 'OPERATE',
       priority: getPriority('high'),
       title: 'Organização comercial centralizada',
@@ -63,16 +64,14 @@ export function runDiagnosticEngine(
   }
 
   // 2. FOLLOW-UP (OPERATE + AUTOMATE)
-  let followUp = getString('follow_up');
-  if (!followUp && ['whatsapp', 'memory', 'no_place'].includes(leadOrg)) {
-    followUp = 'no_follow_up';
-  }
+  const followUp = getString('follow_up');
   if (['sometimes', 'usually_not', 'no_follow_up'].includes(followUp)) {
     categoryScores.OPERATE += 30;
     categoryScores.AUTOMATE += 20;
     const reasonKeys = [`follow_up:${followUp}`];
     recommendations.push({
       digitalCheckId,
+      recommendationKey: 'follow_up_process',
       category: 'OPERATE',
       priority: getPriority('high'),
       title: 'Acompanhamento comercial consistente',
@@ -84,16 +83,13 @@ export function runDiagnosticEngine(
   }
 
   // 3. INTEGRAÇÃO ENTRE SISTEMAS (AUTOMATE)
-  let sysIntegration = getString('system_integration');
-  const websiteTools = [...getArray('website_and_tools'), ...getArray('website_function')];
-  if (!sysIntegration && websiteTools.includes('mostly_manual')) {
-    sysIntegration = 'mostly_manual';
-  }
+  const sysIntegration = getString('system_integration');
   if (['mostly_manual', 'isolated_islands'].includes(sysIntegration)) {
     categoryScores.AUTOMATE += 40;
     const reasonKeys = [`system_integration:${sysIntegration}`];
     recommendations.push({
       digitalCheckId,
+      recommendationKey: 'system_integration',
       category: 'AUTOMATE',
       priority: getPriority('high'),
       title: 'Conexão direta entre ferramentas',
@@ -111,6 +107,7 @@ export function runDiagnosticEngine(
     const reasonKeys = [`manual_tasks:count_${manualTasks.length}`, ...manualTasks.map((t) => `manual_task:${t}`)];
     recommendations.push({
       digitalCheckId,
+      recommendationKey: 'manual_tasks_automation',
       category: 'AUTOMATE',
       priority: getPriority('high'),
       title: 'Automação de rotinas semanais',
@@ -122,7 +119,7 @@ export function runDiagnosticEngine(
   }
 
   // 5. SITE E PRESENÇA DIGITAL (BUILD)
-  const websiteFunctions = websiteTools;
+  const websiteFunctions = getArray('website_function');
   const leadSources = getArray('lead_sources');
   const hasDigitalAcquisition = leadSources.some((s) => ['instagram', 'google', 'paid_ads', 'website'].includes(s));
   const siteIsPassive =
@@ -135,6 +132,7 @@ export function runDiagnosticEngine(
     const reasonKeys = ['website_function:passive', ...leadSources.map((s) => `lead_source:${s}`)];
     recommendations.push({
       digitalCheckId,
+      recommendationKey: 'website_active',
       category: 'BUILD',
       priority: getPriority('medium'),
       title: 'Site ativo no processo comercial',
@@ -152,6 +150,7 @@ export function runDiagnosticEngine(
     const reasonKeys = ['website_function:lead_capture', `lead_organization:${leadOrg}`];
     recommendations.push({
       digitalCheckId,
+      recommendationKey: 'website_lead_capture',
       category: 'BUILD',
       priority: getPriority('medium'),
       title: 'Integração de formulários com funil comercial',
@@ -163,19 +162,16 @@ export function runDiagnosticEngine(
   }
 
   // 7. INTELIGÊNCIA ARTIFICIAL CONCRETA (INTELLIGENCE)
-  const aiOpportunities = [
-    ...getArray('ai_opportunity').filter((o) => o !== 'no_idea'),
-    ...(websiteFunctions.includes('ai_interest') ? ['support', 'process_auto'] : []),
-  ];
+  // Regra estrita: só recomenda INTELLIGENCE se houver interesse E problema compatível com IA
+  const aiOpportunities = getArray('ai_opportunity').filter((o) => o !== 'no_idea');
   const hasConcreteNeed =
     manualTasks.includes('faq_reply') ||
     manualTasks.includes('proposals') ||
     manualTasks.includes('copy_paste') ||
     getArray('lead_handling').includes('manual_reply') ||
-    aiOpportunities.includes('support') ||
-    aiOpportunities.includes('process_auto');
+    aiOpportunities.includes('support');
 
-  if (aiOpportunities.length > 0 && (hasConcreteNeed || manualTasks.length >= 2)) {
+  if (aiOpportunities.length > 0 && hasConcreteNeed) {
     categoryScores.INTELLIGENCE += 30;
     const reasonKeys = [
       ...aiOpportunities.map((o) => `ai_interest:${o}`),
@@ -183,6 +179,7 @@ export function runDiagnosticEngine(
     ];
     recommendations.push({
       digitalCheckId,
+      recommendationKey: 'concrete_intelligence',
       category: 'INTELLIGENCE',
       priority: getPriority('medium'),
       title: 'Assistência inteligente sem complexidade inútil',

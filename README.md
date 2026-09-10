@@ -1,94 +1,161 @@
-# I Can’t Believe It’s AI — beta
+# I Can’t Believe It’s AI — !AI DIGITAL CHECK
 
-Site institucional em português, React 19 + TypeScript, com Vinext (Next.js App Router em Vite) para Sites/Cloudflare e opção estática com Vite para Vercel e Netlify.
-
----
-
-## !AI DIGITAL CHECK
-
-O **!AI Digital Check** é uma ferramenta interativa nativa de diagnóstico operacional e comercial. Ele transforma o formulário de contato inicial em um fluxo de qualificação em 10 etapas, com salvamento progressivo e motor determinístico de recomendações.
-
-### 1. Fluxo do Usuário
-1. **Formulário Inicial (`#contato`)**: O visitante preenche nome, empresa, e-mail, site (opcional), desafio atual e autoriza o contato comercial (LGPD).
-2. **Salvamento do Lead**: Antes de iniciar o questionário, os dados são salvos via `POST /api/leads`. Se o usuário abandonar, as informações não são perdidas.
-3. **Sessão Segura**: É gerada uma sessão via `POST /api/digital-check` com um token de retomada seguro (`resume_token`).
-4. **Introdução**: Transição para o diagnóstico: *"Entendi. Vamos descobrir onde está o gargalo. Leva cerca de 3 minutos."*
-5. **Questionário Progressivo**: 10 etapas oficiais (01 / 10 a 10 / 10), com 1 pergunta por tela:
-   - Q1 `lead_sources`: Aquisição de clientes
-   - Q2 `lead_handling`: Atendimento e triagem
-   - Q3 `lead_organization`: Onde as oportunidades ficam (com alerta do mascote: *"memória não é CRM."*)
-   - Q4 `follow_up`: Acompanhamento de propostas e clientes
-   - Q5 `manual_tasks`: Tarefas manuais recorrentes (com alerta *"we need to talk."*)
-   - Q6 `system_integration`: Integração entre ferramentas (site → WhatsApp → CRM)
-   - Q7 `website_function`: Papel do site na rotina da empresa
-   - Q8 `ai_opportunity`: Oportunidades para IA ("Não faço ideia" é válida)
-   - Q9 `main_bottleneck`: Principal gargalo descrito em texto livre
-   - Q10 `urgency`: Grau de urgência na escala 1 a 5
-6. **Persistência Progressiva**: A cada avanço ("Continuar →"), a resposta é salva via `PATCH /api/digital-check/:id/answers` com garantia de idempotência (UPSERT).
-7. **Motor de Regras**: Em `POST /api/digital-check/:id/complete`, a engine avalia as 4 categorias oficiais:
-   - `BUILD`: Presença digital, interfaces e captação ativa.
-   - `AUTOMATE`: Eliminação de tarefas manuais e integração entre ferramentas.
-   - `INTELLIGENCE`: Uso de IA apenas quando houver necessidade concreta (não recomenda IA cegamente).
-   - `OPERATE`: CRM, follow-up e organização comercial.
-8. **Resultado**: Cards de recomendações contextualizadas com `reasonKeys` rastreáveis e CTA comercial final (*"Quero conversar sobre isso ↗"*).
+Aplicação web em português desenvolvida com React 19 + TypeScript, utilizando Vinext (Next.js App Router sobre Vite) com suporte a runtime server e opção de bundle estático SPA para deploy CDN.
 
 ---
 
-### 2. Estrutura de Banco de Dados (PostgreSQL)
+## 1. Arquitetura do Sistema
 
-O arquivo [`db/schema.sql`](db/schema.sql) contém o DDL completo para PostgreSQL:
-- `leads`: Registro inicial do contato comercial com `consent_at` e versão da política.
-- `digital_checks`: Sessões de diagnóstico, vinculadas ao lead com hash SHA-256 do token de retomada (`resume_token_hash`).
-- `digital_check_answers`: Respostas individuais em `JSONB` com constraint `UNIQUE (digital_check_id, question_key)`.
-- `digital_check_recommendations`: Oportunidades geradas pela engine de regras.
+```
+[ Visitante / Cliente Web ]
+          │
+          ▼  (HTTPS / JSON / Bearer / x-resume-token)
+┌─────────────────────────────────────────────────────────┐
+│               App Router & API Endpoints                │
+│  - POST /api/leads                                      │
+│  - POST /api/digital-check                              │
+│  - GET  /api/digital-check/:id                          │
+│  - PATCH/POST /api/digital-check/:id/answers            │
+│  - POST /api/digital-check/:id/complete                 │
+└──────────────────────────┬──────────────────────────────┘
+                           │  (Repository Singleton)
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│              PostgreSQL Storage Layer                   │
+│  - Pool conservador (max: 5 conexões, timeouts)         │
+│  - Queries estritamente parametrizadas ($1, $2, ...)    │
+│  - Transações com Row-Level Locking (FOR UPDATE)        │
+│  - Constraints: CHECKs de score, current_step, UNIQUEs  │
+└──────────────────────────┬──────────────────────────────┘
+                           │  (Futuro / Desacoplado)
+                           ▼
+          [ CRM & Webhook Notifier (Assíncrono) ]
+```
 
-### 3. Endpoints da API
+---
 
-- `POST /api/leads`: Validação de backend, proteção anti-spam (honeypot, rate-limiting, normalização) e criação do lead.
-- `POST /api/digital-check`: Inicialização da sessão e retorno de `digitalCheckId` + `resumeToken`.
-- `GET /api/digital-check/:id`: Recuperação de estado e respostas (requer cabeçalho `x-resume-token`).
-- `PATCH /api/digital-check/:id/answers`: Gravação progressiva de resposta (requer cabeçalho `x-resume-token`).
-- `POST /api/digital-check/:id/complete`: Execução idempotente do cálculo de diagnóstico e geração de recomendações.
+## 2. Fluxo do !AI Digital Check
 
-### 4. Ambientes e Persistência
+1. **Formulário Comercial (`#contato`)**:
+   - Coleta nome, empresa, e-mail, WhatsApp (com DDD), site/Instagram (opcional) e o desafio atual.
+   - Validação estrita de consentimento LGPD: aceita **apenas boolean literal `true`**. Valores como `"false"`, `"true"`, `1` ou `0` são rejeitados com HTTP 400.
+   - Proteção anti-bot com honeypot acessível (`company_hp`) e rate limiting em janela deslizante.
 
-- **Produção (`NODE_ENV=production`)**: **Obrigatório definir `DATABASE_URL`**. Se não estiver configurada, a API falhará explicitamente com erro 500/503. Nenhuma operação em produção simula persistência.
-- **Desenvolvimento Local / Testes**: Sem `DATABASE_URL`, o sistema utiliza um repositório em memória estruturado com a mesma interface e idempotência para desenvolvimento ágil.
-- **Target Estático (`npm run build:static`)**: Gera o site como SPA. Se executado sem backend de API ativo, a interface exibirá aviso claro de indisponibilidade de backend, sem mascarar ou fingir salvamento de dados.
+2. **Criação do Lead (`POST /api/leads`)**:
+   - Cria o lead em `leads` com status `created`, normalizando e-mail (`trim().toLowerCase()`) e telefone.
+   - Retorna `{ leadId }`. Em caso de erro na etapa seguinte, o frontend mantém o `leadId` para evitar duplicatas em retentativas.
 
-### 5. Variáveis de Ambiente
+3. **Criação da Sessão (`POST /api/digital-check`)**:
+   - Valida existência do `leadId` no banco.
+   - Gera um `resumeToken` criptograficamente seguro (256 bits via `node:crypto`).
+   - Calcula o hash SHA-256 e persiste **somente o hash** (`resume_token_hash`) no banco.
+   - Retorna o token bruto exclusivamente ao navegador para armazenamento em `sessionStorage`. O hash nunca é exposto ao cliente.
 
-Configure no arquivo `.env` ou nas variáveis do servidor:
+4. **10 Etapas Canônicas (01 / 10 a 10 / 10)**:
+   - Apresentação limpa com 1 pergunta focal por tela (sem blocos aninhados):
+     - `01 / 10`: `lead_sources` (Aquisição de clientes)
+     - `02 / 10`: `lead_handling` (Primeiro atendimento e triagem)
+     - `03 / 10`: `lead_organization` (Gestão comercial - CRM, planilhas, WhatsApp ou memória)
+     - `04 / 10`: `follow_up` (Acompanhamento e lembretes de clientes)
+     - `05 / 10`: `manual_tasks` (Tarefas manuais repetitivas da equipe)
+     - `06 / 10`: `system_integration` (Integração entre sistemas)
+     - `07 / 10`: `website_function` (Papel do site no processo de vendas)
+     - `08 / 10`: `ai_opportunity` (Onde automação/IA traria alívio)
+     - `09 / 10`: `main_bottleneck` (Principal gargalo operacional em texto livre)
+     - `10 / 10`: `urgency` (Nível de urgência na escala 1 a 5)
+
+5. **Salvamento Progressivo e `current_step`**:
+   - A cada resposta, o cliente envia `POST /api/digital-check/:id/answers` com o cabeçalho `x-resume-token`.
+   - **Convenção de `current_step`**: representa a **próxima etapa que o usuário deve ver** (1 a 10).
+   - O PostgreSQL é a fonte da verdade: ao recarregar a página (refresh) ou retomar a sessão, o frontend consulta `GET /api/digital-check/:id` e posiciona o usuário exatamente na etapa indicada pelo banco.
+
+6. **Finalização Atômica e Idempotente (`POST /api/digital-check/:id/complete`)**:
+   - Utiliza transação real PostgreSQL com `SELECT ... FOR UPDATE` (row lock).
+   - Se a sessão já estiver com `status = 'completed'`, retorna imediatamente os dados existentes **sem recalcular, sem duplicar recomendações e sem alterar `completed_at`**.
+   - Se pendente, executa a engine determinística, grava as recomendações (garantidas sem duplicatas via `UNIQUE (digital_check_id, recommendation_key)`), atualiza `status = 'completed'`, `score` e `primary_opportunity`, gravando `completed_at = NOW()` uma única vez.
+   - Qualquer tentativa de `PATCH /answers` após a conclusão é bloqueada com HTTP 409 Conflict.
+
+---
+
+## 3. Banco de Dados PostgreSQL
+
+### DDL do Schema
+O arquivo [`db/schema.sql`](db/schema.sql) contém as definições completas:
+- Extensão `pgcrypto` para geração de UUIDs padrão v4.
+- Tabela `leads`: dados cadastrais do contato, consentimento e versão de política.
+- Tabela `digital_checks`: controle da sessão, com índice UNIQUE para `resume_token_hash`, constraint `CHECK (current_step BETWEEN 1 AND 10)`, `CHECK (score IS NULL OR score BETWEEN 0 AND 100)` e `CHECK` para `primary_opportunity`.
+- Tabela `digital_check_answers`: respostas com constraint `UNIQUE (digital_check_id, question_key)`.
+- Tabela `digital_check_recommendations`: recomendações com `UNIQUE (digital_check_id, recommendation_key)`.
+
+### Como Aplicar o Schema
+```sh
+# Via cliente psql
+psql "$DATABASE_URL" -f db/schema.sql
+
+# Ou executando o arquivo SQL no dashboard do seu provedor (Supabase, Neon, RDS, etc.)
+```
+
+---
+
+## 4. Variáveis de Ambiente e Configuração
+
+Crie um arquivo `.env` na raiz do projeto (nunca suba credenciais ao controle de versão):
+
 ```env
-# Banco de dados PostgreSQL (obrigatório em produção)
-DATABASE_URL=postgresql://usuario:senha@host:5432/banco?sslmode=require
+# URL de conexão com o PostgreSQL (OBRIGATÓRIO em produção)
+DATABASE_URL=postgresql://usuario:senha@host:5432/nome_do_banco?sslmode=require
 
-# Integrações futuras opcionais
+# Configuração de SSL do banco
+# Opções: 'true' (padrão em nuvem), 'false' (desliga SSL em testes locais)
+DATABASE_SSL=true
+
+# Se o provedor usar certificado autoassinado (ex: RDS sem CA instalada), definir como 'false':
+DATABASE_SSL_REJECT_UNAUTHORIZED=true
+
+# Webhook assíncrono para envio de leads qualificados (opcional)
 CRM_WEBHOOK_URL=https://meucrm.com/api/webhook
+
+# Chaves para envio de e-mails transacionais (opcional)
 EMAIL_API_KEY=sua_chave_resend_ou_sendgrid
 INTERNAL_ALERT_EMAIL=contato@icantbelieveitsai.com.br
 ```
 
----
-
-## Como Personalizar
-
-- **Perguntas**: Edite [`lib/digital-check/questions.ts`](lib/digital-check/questions.ts) para adicionar opções ou ajustar textos.
-- **Regras de Diagnóstico**: Edite [`lib/digital-check/engine.ts`](lib/digital-check/engine.ts) para calibrar pesos, regras ou adicionar novas recomendações.
-- **Integração CRM**: Adicione o payload do seu CRM em [`lib/services/crm.ts`](lib/services/crm.ts).
-- **Notificações por E-mail**: Configure o provedor em [`lib/services/email.ts`](lib/services/email.ts).
+### Regras Estritas de Ambiente
+- **Produção (`NODE_ENV=production`)**: Se `DATABASE_URL` não estiver definida, a aplicação **falha explicitamente com HTTP 500**. Nunca existe fallback silencioso para memória em produção. A mensagem retornada ao visitante é genérica (*"Não conseguimos preparar seu Digital Check agora. Tente novamente em alguns instantes."*), sem expor detalhes internos ou nomes de variáveis.
+- **Desenvolvimento e Testes Locais**: Se `DATABASE_URL` estiver ausente, o repositório em memória (`InMemoryRepository`) é utilizado automaticamente para agilizar o desenvolvimento sem depender de infraestrutura externa.
 
 ---
 
-## Executar Localmente
+## 5. Como Testar e Executar
 
+### 1. Testes Automatizados dos 22 Cenários
+Executa a suíte de testes ponta a ponta validando todos os requisitos de segurança, idempotência, concorrência e constraints:
 ```sh
-npm run dev
+npx tsx scripts/test-scenarios.ts
 ```
 
-Para validar tipos e compilação:
+### 2. Validação de Tipos (TypeScript)
 ```sh
 npm run typecheck
+```
+
+### 3. Build do Servidor (Vinext SSR / API)
+```sh
 npm run build
+```
+
+### 4. Build SPA Estático (Vite)
+```sh
 npm run build:static
 ```
+
+> **Atenção sobre o Build Estático**: O build SPA estático gera arquivos para CDNs estáticas (ex: Netlify, Vercel estático). Ele não inclui o backend Node/PostgreSQL por si só. Se executado sem a API configurada, o Digital Check detecta que o backend não está acessível e informa o usuário adequadamente, sem simular persistência falsa.
+
+---
+
+## 6. Como Estender o Diagnóstico
+
+- **Novas Perguntas ou Opções**: Altere [`lib/digital-check/questions.ts`](lib/digital-check/questions.ts) e atualize as opções permitidas em [`lib/digital-check/validation.ts`](lib/digital-check/validation.ts).
+- **Regras de Recomendação**: Edite [`lib/digital-check/engine.ts`](lib/digital-check/engine.ts). Cada recomendação deve possuir um `recommendationKey` único para manter a idempotência.
+- **Integração com CRM**: Implemente a chamada para seu CRM em [`lib/services/crm.ts`](lib/services/crm.ts). O Digital Check despacha o payload de forma assíncrona após a transação de finalização.
+- **Alertas por E-mail**: Implemente seu disparador em [`lib/services/email.ts`](lib/services/email.ts).

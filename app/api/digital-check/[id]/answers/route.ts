@@ -1,20 +1,6 @@
-import { NextResponse } from 'next/server';
 import { verifyResumeToken } from '@/lib/digital-check/security';
 import { getRepository } from '@/lib/digital-check/storage';
-
-const VALID_QUESTION_KEYS = new Set([
-  'lead_sources',
-  'lead_handling',
-  'lead_organization',
-  'follow_up',
-  'manual_tasks',
-  'system_integration',
-  'website_function',
-  'website_and_tools',
-  'ai_opportunity',
-  'main_bottleneck',
-  'urgency',
-]);
+import { parseJsonBody, validateSaveAnswerPayload } from '@/lib/digital-check/validation';
 
 async function handleSaveAnswer(
   request: Request,
@@ -23,40 +9,54 @@ async function handleSaveAnswer(
   try {
     const { id } = await params;
     const token =
-      request.headers.get('x-resume-token') ||
-      request.headers.get('authorization')?.replace('Bearer ', '') ||
+      request.headers.get('x-resume-token')?.trim() ||
+      request.headers.get('authorization')?.replace('Bearer ', '')?.trim() ||
       '';
 
+    // 1. Validação estrita do token de retomada (ITEM 3)
     if (!token) {
-      return NextResponse.json({ error: 'Token de autorização ausente.' }, { status: 401 });
+      return Response.json({ error: 'Token de autorização ausente.' }, { status: 401 });
     }
 
     const storage = getRepository();
     const check = await storage.getDigitalCheck(id);
     if (!check) {
-      return NextResponse.json({ error: 'Sessão de Digital Check não encontrada.' }, { status: 404 });
+      return Response.json({ error: 'Sessão de Digital Check não encontrada.' }, { status: 404 });
     }
 
     if (!verifyResumeToken(token, check.resumeTokenHash)) {
-      return NextResponse.json({ error: 'Acesso não autorizado para esta sessão.' }, { status: 403 });
+      return Response.json({ error: 'Acesso não autorizado para esta sessão.' }, { status: 403 });
     }
 
-    const body = (await request.json()) as Record<string, any>;
-    const questionKey = String(body.questionKey || '').trim();
-    const answerJson = body.answerJson;
-
-    if (!VALID_QUESTION_KEYS.has(questionKey)) {
-      return NextResponse.json({ error: 'Chave de pergunta inválida.' }, { status: 400 });
+    // 2. Bloquear alteração após conclusão (ITEM 36)
+    if (check.status === 'completed') {
+      return Response.json(
+        { error: 'Não é possível alterar respostas de um Digital Check já concluído.' },
+        { status: 409 }
+      );
     }
 
-    if (answerJson === undefined || answerJson === null) {
-      return NextResponse.json({ error: 'Conteúdo da resposta é obrigatório.' }, { status: 400 });
+    // 3. Parsing seguro do corpo da requisição (ITEM 19)
+    const parsed = await parseJsonBody(request);
+    if (!parsed.success) {
+      return parsed.response;
     }
 
-    // UPSERT idempotente da resposta
-    const saved = await storage.upsertAnswer(id, questionKey, answerJson);
+    // 4. Validação estrita do questionKey e formato da resposta (ITEM 30 e 31)
+    const validation = validateSaveAnswerPayload(parsed.data);
+    if (!validation.valid) {
+      return Response.json({ error: validation.error }, { status: validation.status });
+    }
 
-    return NextResponse.json({
+    // 5. UPSERT idempotente da resposta e atualização do current_step (ITEM 2 e 9)
+    const saved = await storage.upsertAnswer(
+      id,
+      validation.data.questionKey,
+      validation.data.answerJson,
+      validation.data.nextStep
+    );
+
+    return Response.json({
       success: true,
       answer: {
         questionKey: saved.questionKey,
@@ -64,9 +64,15 @@ async function handleSaveAnswer(
       },
     });
   } catch (err: unknown) {
+    if ((err as any)?.statusCode === 409) {
+      return Response.json({ error: (err as Error).message }, { status: 409 });
+    }
     // eslint-disable-next-line no-console
     console.error('[answers route error]:', err);
-    return NextResponse.json({ error: 'Falha ao salvar resposta. Tente novamente.' }, { status: 500 });
+    return Response.json(
+      { error: 'Falha ao salvar resposta. Tente novamente.' },
+      { status: 500 }
+    );
   }
 }
 

@@ -1,48 +1,41 @@
-import { NextResponse } from 'next/server';
 import { generateResumeToken, hashResumeToken } from '@/lib/digital-check/security';
 import { getRepository } from '@/lib/digital-check/storage';
+import { parseJsonBody } from '@/lib/digital-check/validation';
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as Record<string, any>;
-    const leadId = String(body.leadId || '').trim();
+    const parsed = await parseJsonBody(request);
+    if (!parsed.success) {
+      return parsed.response;
+    }
+
+    const body = parsed.data as Record<string, unknown>;
+    const leadId = typeof body.leadId === 'string' ? body.leadId.trim() : '';
 
     if (!leadId) {
-      return NextResponse.json({ error: 'leadId é obrigatório para iniciar a sessão.' }, { status: 400 });
+      return Response.json({ error: 'leadId é obrigatório para iniciar a sessão.' }, { status: 400 });
     }
 
     const storage = getRepository();
-    let lead = await storage.getLead(leadId);
 
-    if (!lead && body.leadData) {
-      const now = new Date().toISOString();
-      lead = await storage.createLead({
-        name: String(body.leadData.name || 'Lead').trim(),
-        company: String(body.leadData.company || 'Empresa').trim(),
-        email: String(body.leadData.email || '').trim(),
-        whatsapp: String(body.leadData.whatsapp || body.leadData.phone || '').trim(),
-        websiteOrInstagram: body.leadData.website ? String(body.leadData.website).trim() : undefined,
-        initialProblem: String(body.leadData.message || body.leadData.initialProblem || 'Diagnóstico').trim(),
-        consent: true,
-        consentAt: now,
-        privacyPolicyVersion: '2026.1',
-      });
-    }
-
+    // 1. Validar que leadId existe antes de criar Digital Check (ITEM 38)
+    const lead = await storage.getLead(leadId);
     if (!lead) {
-      return NextResponse.json({ error: 'Lead não encontrado.' }, { status: 404 });
+      return Response.json({ error: 'Lead não encontrado.' }, { status: 404 });
     }
 
-    // Gerar token de retomada criptográfico seguro
+    // 2. Gerar token de retomada criptograficamente seguro (ITEM 3)
     const resumeToken = generateResumeToken();
     const resumeTokenHash = hashResumeToken(resumeToken);
 
+    // 3. Persistir sessão associada ao lead (armazenando SOMENTE o hash)
     const digitalCheck = await storage.createDigitalCheck({
       leadId,
       resumeTokenHash,
     });
 
-    return NextResponse.json(
+    // 4. Retornar token bruto exclusivamente ao cliente que iniciou a sessão
+    return Response.json(
       {
         digitalCheckId: digitalCheck.id,
         resumeToken,
@@ -52,8 +45,8 @@ export async function POST(request: Request) {
   } catch (err: unknown) {
     // eslint-disable-next-line no-console
     console.error('[POST /api/digital-check error]:', err);
-    return NextResponse.json(
-      { error: 'Não foi possível iniciar a sessão de diagnóstico.' },
+    return Response.json(
+      { error: 'Não conseguimos preparar seu Digital Check agora. Tente novamente em alguns instantes.' },
       { status: 500 }
     );
   }

@@ -1,13 +1,22 @@
 'use client';
 import { ArrowIcon } from './arrow-icon';
-import {useEffect,useState} from 'react';
-import {Checkbox} from '@/components/ui/checkbox';
-import {config} from './site.config';
-export function Enhancements(){const [open,setOpen]=useState(false);useEffect(()=>{const observer=new IntersectionObserver(entries=>entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('seen');observer.unobserve(e.target)}}),{threshold:.06});document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));return()=>observer.disconnect()},[]);return <div className="mobile-menu"><button aria-expanded={open} aria-controls="mobile-nav" onClick={()=>setOpen(!open)}>{open?'Fechar ×':'Menu +'}</button>{open&&<nav id="mobile-nav" aria-label="Navegação móvel">{config.nav.map(([label,id])=><a key={id} href={'#'+id} onClick={()=>setOpen(false)}>{label} <ArrowIcon /></a>)}</nav>}</div>}
-export function Briefing({ onStartCheck }: { onStartCheck?: (checkId: string, token: string, lead: { name: string; company: string; websiteOrInstagram?: string }) => void }) {
+import { useEffect, useRef, useState } from 'react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { config } from './site.config';
+
+export function Briefing({
+  onStartCheck,
+}: {
+  onStartCheck?: (
+    checkId: string,
+    token: string,
+    lead: { name: string; company: string; websiteOrInstagram?: string }
+  ) => void;
+}) {
   const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const existingLeadIdRef = useRef<string | null>(null);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -16,7 +25,7 @@ export function Briefing({ onStartCheck }: { onStartCheck?: (checkId: string, to
     const form = e.currentTarget;
     const data = new FormData(form);
 
-    // Honeypot check
+    // 1. Honeypot check (ITEM 27)
     const hp = String(data.get('company_hp') || '');
     if (hp) {
       setError('Submissão inválida.');
@@ -31,44 +40,52 @@ export function Briefing({ onStartCheck }: { onStartCheck?: (checkId: string, to
     const message = String(data.get('message') || '').trim();
 
     const cleanPhone = whatsapp.replace(/\D/g, '');
-    if (name.length < 2 || company.length < 2 || message.length < 10 || cleanPhone.length < 10 || !consent) {
-      setError('Preencha nome, empresa, WhatsApp válido (com DDD), desafio (mínimo 10 caracteres) e autorize o tratamento dos dados.');
+    if (name.length < 2 || company.length < 2 || message.length < 10 || cleanPhone.length < 10) {
+      setError('Preencha nome, empresa, WhatsApp válido (com DDD) e o desafio atual (mínimo 10 caracteres).');
+      return;
+    }
+
+    // Validação estrita de consentimento no client antes do envio (ITEM 1)
+    if (consent !== true) {
+      setError('É necessário autorizar o contato para prosseguir com o Digital Check.');
       return;
     }
 
     setLoading(true);
 
     try {
-      // 1. Salvar lead no backend antes de iniciar o questionário
-      const leadRes = await fetch('/api/leads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          company,
-          email,
-          whatsapp,
-          website,
-          message,
-          consent: true,
-        }),
-      });
+      // 1. Salvar lead no backend antes de iniciar o questionário (evita duplicatas em retry com ref)
+      let leadId = existingLeadIdRef.current;
+      if (!leadId) {
+        const leadRes = await fetch('/api/leads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            company,
+            email,
+            whatsapp,
+            website,
+            message,
+            consent: true, // Boolean literal
+          }),
+        });
 
-      if (!leadRes.ok) {
-        const errData = ((await leadRes.json().catch(() => ({}))) || {}) as Record<string, any>;
-        throw new Error(errData.error || 'Não conseguimos salvar seu Digital Check. Tente novamente.');
+        if (!leadRes.ok) {
+          const errData = ((await leadRes.json().catch(() => ({}))) || {}) as Record<string, any>;
+          throw new Error(errData.error || 'Não conseguimos salvar seu Digital Check. Tente novamente.');
+        }
+
+        const leadJson = (await leadRes.json()) as { leadId: string };
+        leadId = leadJson.leadId;
+        existingLeadIdRef.current = leadId;
       }
-
-      const { leadId } = (await leadRes.json()) as { leadId: string };
 
       // 2. Criar sessão de Digital Check com resume token seguro
       const checkRes = await fetch('/api/digital-check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          leadId,
-          leadData: { name, company, email, whatsapp, website, message },
-        }),
+        body: JSON.stringify({ leadId }),
       });
 
       if (!checkRes.ok) {
@@ -76,7 +93,10 @@ export function Briefing({ onStartCheck }: { onStartCheck?: (checkId: string, to
         throw new Error(errData.error || 'Falha ao iniciar a sessão do Digital Check.');
       }
 
-      const { digitalCheckId, resumeToken } = (await checkRes.json()) as { digitalCheckId: string; resumeToken: string };
+      const { digitalCheckId, resumeToken } = (await checkRes.json()) as {
+        digitalCheckId: string;
+        resumeToken: string;
+      };
 
       // 3. Salvar temporariamente na sessionStorage para tolerância a refresh
       if (typeof window !== 'undefined') {
@@ -100,37 +120,93 @@ export function Briefing({ onStartCheck }: { onStartCheck?: (checkId: string, to
 
   return (
     <form onSubmit={submit} className="briefing">
-      {/* Honeypot invisível para proteção contra bots */}
-      <div style={{ display: 'none' }} aria-hidden="true">
-        <input name="company_hp" tabIndex={-1} autoComplete="off" />
+      {/* Honeypot acessível para detecção de bots sem display:none (ITEM 27) */}
+      <div
+        style={{
+          position: 'absolute',
+          opacity: 0,
+          pointerEvents: 'none',
+          height: 0,
+          width: 0,
+          overflow: 'hidden',
+          zIndex: -1,
+        }}
+        aria-hidden="true"
+      >
+        <label htmlFor="company_hp_field">Deixe em branco</label>
+        <input
+          id="company_hp_field"
+          name="company_hp"
+          tabIndex={-1}
+          autoComplete="off"
+        />
       </div>
 
       <div className="form-grid">
         <label>
           Seu nome
-          <input name="name" autoComplete="name" required minLength={2} maxLength={120} placeholder="Como podemos chamar você?" />
+          <input
+            name="name"
+            autoComplete="name"
+            required
+            minLength={2}
+            maxLength={120}
+            placeholder="Como podemos chamar você?"
+          />
         </label>
         <label>
           Empresa
-          <input name="company" autoComplete="organization" required minLength={2} maxLength={160} placeholder="Nome do seu negócio" />
+          <input
+            name="company"
+            autoComplete="organization"
+            required
+            minLength={2}
+            maxLength={160}
+            placeholder="Nome do seu negócio"
+          />
         </label>
         <label>
           E-mail profissional
-          <input name="email" autoComplete="email" type="email" required maxLength={254} placeholder="voce@empresa.com.br" />
+          <input
+            name="email"
+            autoComplete="email"
+            type="email"
+            required
+            maxLength={254}
+            placeholder="voce@empresa.com.br"
+          />
         </label>
         <label>
           WhatsApp <small>(com DDD)</small>
-          <input name="whatsapp" autoComplete="tel" type="tel" required maxLength={25} placeholder="(11) 99999-9999" />
+          <input
+            name="whatsapp"
+            autoComplete="tel"
+            type="tel"
+            required
+            maxLength={30}
+            placeholder="(11) 99999-9999"
+          />
         </label>
         <label style={{ gridColumn: '1 / -1' }}>
           Site ou Instagram <small>(opcional)</small>
-          <input name="website" maxLength={250} placeholder="Onde encontramos sua empresa na internet?" />
+          <input
+            name="website"
+            maxLength={250}
+            placeholder="Onde encontramos sua empresa na internet?"
+          />
         </label>
       </div>
 
       <label>
         O que está tomando seu tempo?
-        <textarea name="message" required minLength={10} maxLength={2500} rows={4} placeholder="Conte sobre a tarefa, processo ou projeto que você quer melhorar." />
+        <textarea
+          name="message"
+          required
+          minLength={10}
+          maxLength={2500}
+          rows={4}
+          placeholder="Conte sobre a tarefa, processo ou projeto que você quer melhorar."
+        />
       </label>
 
       <p className="fine" style={{ margin: '8px 0 16px', color: 'var(--muted)' }}>
@@ -138,16 +214,21 @@ export function Briefing({ onStartCheck }: { onStartCheck?: (checkId: string, to
       </p>
 
       <label className="consent">
-        <Checkbox checked={consent} onCheckedChange={(v) => setConsent(v === true)} aria-label="Autorizo o tratamento das informações para meu diagnóstico" />
+        <Checkbox
+          checked={consent}
+          onCheckedChange={(v) => setConsent(v === true)}
+          aria-label="Autorizo o tratamento das informações para meu diagnóstico"
+        />
         <span>
-          Autorizo o tratamento das informações enviadas para preparação do meu Digital Check e contato sobre o diagnóstico. Li a <a href="#privacidade">Política de Privacidade</a>.
+          Autorizo o tratamento das informações enviadas para preparação do meu Digital Check e contato sobre o diagnóstico. Li a{' '}
+          <a href="#privacidade">Política de Privacidade</a>.
         </span>
       </label>
 
       {error && <p className="form-error" role="alert">{error}</p>}
 
       <button className="button" type="submit" disabled={loading}>
-        {loading ? 'Salvando...' : 'Preparar meu Digital Check'} <ArrowIcon />
+        {loading ? 'Preparando...' : 'Preparar meu Digital Check'} <ArrowIcon />
       </button>
 
       <p className="fine">
@@ -157,3 +238,44 @@ export function Briefing({ onStartCheck }: { onStartCheck?: (checkId: string, to
   );
 }
 
+export function Enhancements() {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            e.target.classList.add('seen');
+            observer.unobserve(e.target);
+          }
+        }),
+      { threshold: 0.06 }
+    );
+    document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div className="mobile-menu">
+      <button
+        aria-expanded={open}
+        aria-controls="mobile-nav"
+        onClick={() => setOpen(!open)}
+      >
+        {open ? 'Fechar ×' : 'Menu +'}
+      </button>
+      {open && (
+        <nav id="mobile-nav" aria-label="Navegação móvel">
+          {config.nav.map((item: string[]) => {
+            const [label, id] = item;
+            return (
+              <a key={id} href={'#' + id} onClick={() => setOpen(false)}>
+                {label} <ArrowIcon />
+              </a>
+            );
+          })}
+        </nav>
+      )}
+    </div>
+  );
+}
