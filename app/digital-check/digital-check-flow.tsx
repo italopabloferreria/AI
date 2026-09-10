@@ -304,8 +304,8 @@ export function DigitalCheckFlow({
         <div className="dc-modal-shell" style={{ maxWidth: '580px' }}>
           <div className="dc-body">
             <div className="dc-complete-card">
-              <div className="dc-complete-badge">CHECK COMPLETE ✓</div>
-              <h2 className="dc-title">I found a few things.</h2>
+              <div className="dc-complete-badge">DIAGNÓSTICO CONCLUÍDO ✓</div>
+              <h2 className="dc-title">Encontrei alguns pontos importantes.</h2>
               <p className="dc-step-desc">
                 Cruzando suas respostas com as quatro frentes da nossa engenharia...
               </p>
@@ -320,9 +320,17 @@ export function DigitalCheckFlow({
   // TELA DE RESULTADO
   // -----------------------------------------------------------
   if (phase === 'result') {
+    const categoryTranslations: Record<Category, string> = {
+      OPERATE: 'OPERAÇÃO',
+      AUTOMATE: 'AUTOMAÇÃO',
+      BUILD: 'CONSTRUÇÃO',
+      INTELLIGENCE: 'INTELIGÊNCIA',
+    };
+
     const count = recommendations.length;
+    const categoryPt = categoryTranslations[primaryOpportunity] || primaryOpportunity;
     const whatsappMsg = encodeURIComponent(
-      `Olá! Concluí meu !AI Digital Check para a ${leadInfo.company || 'minha empresa'}. Gostaria de entender o plano de ação sobre as oportunidades encontradas (${primaryOpportunity}).`
+      `Olá! Concluí meu !AI Digital Check para a ${leadInfo.company || 'minha empresa'}. Gostaria de entender o plano de ação sobre as oportunidades encontradas (${categoryPt}).`
     );
     const whatsappUrl = config.contact.whatsapp
       ? `https://wa.me/${config.contact.whatsapp.replace(/\D/g, '')}?text=${whatsappMsg}`
@@ -357,7 +365,7 @@ export function DigitalCheckFlow({
               {recommendations.map((rec, idx) => (
                 <article key={rec.id || idx} className={`dc-rec-card ${rec.priority}`}>
                   <div className="dc-rec-meta">
-                    <span className="dc-rec-category">{rec.category}</span>
+                    <span className="dc-rec-category">{categoryTranslations[rec.category] || rec.category}</span>
                     <span className="dc-rec-priority">
                       Prioridade {rec.priority === 'high' ? 'Alta' : rec.priority === 'medium' ? 'Média' : 'Baixa'}
                     </span>

@@ -160,7 +160,7 @@ export default function NotFound() {
 
         <div className="cinema-controls">
           <span style={{ color: 'var(--muted)' }}>
-            Código de status: <strong>404 — Not Found</strong>
+            Código de status: <strong>404 — Página não encontrada</strong>
           </span>
           <a href="/#contato">
             Precisa de ajuda? Fale conosco <ArrowIcon />
