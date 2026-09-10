@@ -1,47 +1,64 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { ArrowIcon } from './arrow-icon';
 
 export default function Hero() {
   const video = useRef<HTMLVideoElement>(null);
-  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    const element = video.current;
-    if (!element) return;
+    const el = video.current;
+    if (!el) return;
 
-    let blobUrl = '';
-    // Caminho da mídia codificado (base64) para não expor a URL direta no markup
-    const mediaEndpoint = atob('L2hlcm8tbG9vcC5tcDQ=');
+    // Garante que as propriedades DOM de autoplay silencioso estejam ativas (contorna bug do React com muted)
+    el.defaultMuted = true;
+    el.muted = true;
 
-    fetch(mediaEndpoint)
-      .then((res) => {
-        if (!res.ok) throw new Error('Falha ao carregar stream');
-        return res.blob();
-      })
-      .then((blob) => {
-        blobUrl = URL.createObjectURL(blob);
-        if (element) {
-          element.src = blobUrl;
-          void element.play().catch(() => {});
-        }
-      })
-      .catch(() => setFailed(true));
-
-    const preference = window.matchMedia('(prefers-reduced-motion: reduce)');
-    let visible = false;
-    const applyPreference = () => {
-      if (preference.matches || !visible || document.hidden) element.pause();
-      else void element.play().catch(() => {});
+    const playVideo = () => {
+      el.muted = true;
+      const promise = el.play();
+      if (promise !== undefined) {
+        promise.catch(() => {
+          // Se o navegador ou modo de economia de energia suspender autoplay,
+          // destrava na primeira interação do usuário (toque, clique ou scroll)
+          const unlock = () => {
+            el.muted = true;
+            void el.play().catch(() => {});
+            window.removeEventListener('click', unlock);
+            window.removeEventListener('touchstart', unlock);
+            window.removeEventListener('scroll', unlock);
+          };
+          window.addEventListener('click', unlock, { once: true, passive: true });
+          window.addEventListener('touchstart', unlock, { once: true, passive: true });
+          window.addEventListener('scroll', unlock, { once: true, passive: true });
+        });
+      }
     };
 
-    const observer = new IntersectionObserver(([entry]) => {
-      visible = entry.isIntersecting;
-      applyPreference();
-    });
+    // Tenta reproduzir imediatamente
+    playVideo();
 
-    observer.observe(element);
+    // Pausa se o usuário tiver configurado redução de movimento ou se a aba estiver oculta
+    const preference = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let isVisible = true;
+
+    const applyPreference = () => {
+      if (preference.matches || !isVisible || document.hidden) {
+        el.pause();
+      } else {
+        playVideo();
+      }
+    };
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isVisible = entry.isIntersecting;
+        applyPreference();
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(el);
     preference.addEventListener('change', applyPreference);
     document.addEventListener('visibilitychange', applyPreference);
 
@@ -49,10 +66,7 @@ export default function Hero() {
       observer.disconnect();
       preference.removeEventListener('change', applyPreference);
       document.removeEventListener('visibilitychange', applyPreference);
-      element.pause();
-      if (blobUrl) {
-        URL.revokeObjectURL(blobUrl);
-      }
+      el.pause();
     };
   }, []);
 
@@ -75,22 +89,25 @@ export default function Hero() {
           fetchPriority="high"
           draggable={false}
         />
-        {!failed && (
-          <video
-            ref={video}
-            autoPlay
-            muted
-            loop
-            playsInline
-            tabIndex={-1}
-            controls={false}
-            controlsList="nodownload nofullscreen noremoteplayback"
-            disablePictureInPicture
-            disableRemotePlayback
-            draggable={false}
-            onContextMenu={(e) => e.preventDefault()}
-          />
-        )}
+        <video
+          ref={video}
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          poster="/hero-nex-poster.jpeg"
+          tabIndex={-1}
+          controls={false}
+          controlsList="nodownload nofullscreen noremoteplayback"
+          disablePictureInPicture
+          disableRemotePlayback
+          draggable={false}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <source src="/hero-loop.mp4" type="video/mp4" />
+          <source src="/hero-nex-loop.mp4" type="video/mp4" />
+        </video>
       </div>
       <div className="cinema-copy wrap">
         <div className="eyebrow">I CAN’T BELIEVE IT’S AI / TECNOLOGIA PARA NEGÓCIOS</div>
@@ -115,4 +132,3 @@ export default function Hero() {
     </section>
   );
 }
-
