@@ -22,3 +22,11 @@ video::-webkit-media-controls,video::-webkit-media-controls-enclosure{display:no
  .cinema-hero:after{display:none}
  .cinema-controls{order:2;position:static;padding:14px 20px 20px;gap:12px;background:var(--carbon);font-size:11px}
  }
+.not-found-hero{min-height:calc(100svh - 85px);height:auto}
+.not-found-hero .cinema-copy{padding-block:80px 100px}
+.not-found-actions{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-top:28px}
+.not-found-actions .button{display:inline-flex!important}
+@media(max-width:760px){
+ .not-found-hero .not-found-actions{flex-direction:column;align-items:stretch;margin-top:24px;gap:12px}
+ .not-found-hero .not-found-actions .button{display:inline-flex!important;width:100%;text-align:center;justify-content:center}
+}

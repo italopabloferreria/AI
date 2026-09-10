@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { DigitalCheckFlow } from './digital-check/digital-check-flow';
 import Hero from './hero';
 import { Enhancements } from './interactions';
+import NotFound from './not-found';
 import Sections from './sections';
 import { config as c } from './site.config';
 
@@ -16,6 +17,7 @@ export default function Home() {
   } | null>(null);
 
   const [isDigitalCheckRoute, setIsDigitalCheckRoute] = useState(false);
+  const [isNotFoundRoute, setIsNotFoundRoute] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -24,8 +26,17 @@ export default function Home() {
       window.location.hash === '#digital-check';
     if (isDc) {
       setIsDigitalCheckRoute(true);
+      return;
+    }
+    const path = window.location.pathname;
+    if (path && path !== '/' && path !== '/index.html' && !path.startsWith('/api')) {
+      setIsNotFoundRoute(true);
     }
   }, []);
+
+  if (isNotFoundRoute) {
+    return <NotFound />;
+  }
 
   // Se o Digital Check estiver ativo via submissão do formulário ou rota direta
   if (activeCheck) {
