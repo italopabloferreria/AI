@@ -28,7 +28,10 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # local environment
-.env*
+.env
+.env.local
+.env.*
+.env.*.local
 !.env.example
 
 # deployment and generated files
