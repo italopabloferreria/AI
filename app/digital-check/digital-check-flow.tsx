@@ -2,12 +2,11 @@
 
 import { ArrowIcon } from '../arrow-icon';
 import { useEffect, useState } from 'react';
-import { DIGITAL_CHECK_STEPS, DIGITAL_CHECK_QUESTIONS } from '@/lib/digital-check/questions';
+import { DIGITAL_CHECK_STEPS, URGENCY_SCALE_OPTIONS, type StepDefinition } from '@/lib/digital-check/questions';
 import type {
   AnswerValue,
   Category,
   DigitalCheckRecommendation,
-  QuestionDefinition,
 } from '@/lib/digital-check/types';
 import { config } from '../site.config';
 
@@ -37,8 +36,10 @@ export function DigitalCheckFlow({
     initialCheckId ? 'intro' : 'questionnaire'
   );
 
-  const [currentStepIndex, setCurrentStepIndex] = useState(0); // 0 a 4 (correspondente a 01 / 05 a 05 / 05)
-  const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
+  const [currentStepIndex, setCurrentStepIndex] = useState(0); // 0 a 4 (01 / 05 a 05 / 05)
+  const [answers, setAnswers] = useState<Record<string, AnswerValue>>({
+    urgency: '3', // valor inicial equilibrado
+  });
   const [otherTexts, setOtherTexts] = useState<Record<string, string>>({});
 
   const [savingStatus, setSavingStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -74,19 +75,17 @@ export function DigitalCheckFlow({
             for (const a of data.answers) {
               restored[a.questionKey] = a.answerJson;
             }
-            setAnswers(restored);
+            setAnswers((prev) => ({ ...prev, ...restored }));
 
             if (data.digitalCheck?.status === 'completed') {
               setRecommendations(data.recommendations || []);
               setPrimaryOpportunity(data.digitalCheck.primaryOpportunity || 'AUTOMATE');
               setPhase('result');
             } else {
-              // Calcula etapa baseada nas perguntas já respondidas
               const answeredKeys = Object.keys(restored);
               for (let i = 0; i < DIGITAL_CHECK_STEPS.length; i++) {
-                const stepQuestions = DIGITAL_CHECK_STEPS[i].questions;
-                const allAnswered = stepQuestions.every((q) => answeredKeys.includes(q.key));
-                if (!allAnswered) {
+                const stepKey = DIGITAL_CHECK_STEPS[i].key;
+                if (!answeredKeys.includes(stepKey)) {
                   setCurrentStepIndex(i);
                   break;
                 }
@@ -99,7 +98,7 @@ export function DigitalCheckFlow({
   }, [initialCheckId, initialResumeToken]);
 
   // Etapa atual (1 de 5)
-  const currentStep = DIGITAL_CHECK_STEPS[currentStepIndex];
+  const currentStep: StepDefinition = DIGITAL_CHECK_STEPS[currentStepIndex] || DIGITAL_CHECK_STEPS[0];
 
   // Manipulação de seleção única
   const handleSingleSelect = (key: string, val: string) => {
@@ -112,12 +111,13 @@ export function DigitalCheckFlow({
     const list = Array.isArray(answers[key]) ? [...(answers[key] as string[])] : [];
     const index = list.indexOf(val);
 
-    if (val === 'none' || val === 'no_idea') {
-      setAnswers((prev) => ({ ...prev, [key]: [val] }));
+    if (val === 'none') {
+      setAnswers((prev) => ({ ...prev, [key]: ['none'] }));
+      setErrorMessage('');
       return;
     }
 
-    const filtered = list.filter((item) => item !== 'none' && item !== 'no_idea');
+    const filtered = list.filter((item) => item !== 'none');
     if (index > -1) {
       filtered.splice(filtered.indexOf(val), 1);
     } else {
@@ -128,17 +128,23 @@ export function DigitalCheckFlow({
     setErrorMessage('');
   };
 
-  // Salvar respostas do bloco atual e avançar
+  // Salvar respostas da etapa atual e avançar
   const saveAndAdvance = async () => {
-    // Validar se todas as perguntas do bloco atual foram respondidas
-    for (const q of currentStep.questions) {
-      const val = answers[q.key];
+    // Validação da etapa atual
+    if (currentStep.type === 'composite_bottleneck') {
+      const textVal = typeof answers.main_bottleneck === 'string' ? answers.main_bottleneck.trim() : '';
+      if (textVal.length < 5) {
+        setErrorMessage('Por favor, descreva brevemente seu principal gargalo (mínimo 5 caracteres).');
+        return;
+      }
+    } else {
+      const val = answers[currentStep.key];
       if (!val || (Array.isArray(val) && val.length === 0)) {
-        setErrorMessage(`Por favor, responda o bloco: "${q.question}"`);
+        setErrorMessage('Por favor, selecione ao menos uma opção para continuar.');
         return;
       }
       if (typeof val === 'string' && val.trim().length === 0) {
-        setErrorMessage(`Por favor, preencha o bloco: "${q.question}"`);
+        setErrorMessage('Por favor, preencha este campo para continuar.');
         return;
       }
     }
@@ -148,10 +154,15 @@ export function DigitalCheckFlow({
 
     try {
       if (digitalCheckId && resumeToken) {
-        // Envia as respostas do passo atual
-        for (const q of currentStep.questions) {
-          let finalAnswer = answers[q.key];
-          const otherText = otherTexts[q.key];
+        // Preparar respostas a enviar
+        const toSend: { key: string; value: AnswerValue }[] = [];
+
+        if (currentStep.type === 'composite_bottleneck') {
+          toSend.push({ key: 'main_bottleneck', value: answers.main_bottleneck || '' });
+          toSend.push({ key: 'urgency', value: answers.urgency || '3' });
+        } else {
+          let finalAnswer = answers[currentStep.key];
+          const otherText = otherTexts[currentStep.key];
           if (otherText && otherText.trim()) {
             if (Array.isArray(finalAnswer)) {
               finalAnswer = [...finalAnswer, `outro:${otherText.trim()}`];
@@ -159,38 +170,61 @@ export function DigitalCheckFlow({
               finalAnswer = `${finalAnswer} (${otherText.trim()})`;
             }
           }
+          toSend.push({ key: currentStep.key, value: finalAnswer });
 
-          await fetch(`/api/digital-check/${digitalCheckId}/answers`, {
-            method: 'PATCH',
+          // Deduções para enriquecer o diagnóstico
+          if (currentStep.key === 'lead_organization') {
+            const org = String(finalAnswer);
+            if (['whatsapp', 'memory', 'no_place'].includes(org)) {
+              toSend.push({ key: 'follow_up', value: 'no_follow_up' });
+            } else if (org === 'spreadsheet') {
+              toSend.push({ key: 'follow_up', value: 'manual_track' });
+            } else if (org === 'crm') {
+              toSend.push({ key: 'follow_up', value: 'crm_alert' });
+            }
+          }
+        }
+
+        for (const item of toSend) {
+          const res = await fetch(`/api/digital-check/${digitalCheckId}/answers`, {
+            method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'x-resume-token': resumeToken,
             },
             body: JSON.stringify({
-              questionKey: q.key,
-              answerJson: finalAnswer,
+              questionKey: item.key,
+              answerJson: item.value,
             }),
           });
+
+          if (!res.ok) {
+            const err = ((await res.json().catch(() => ({}))) || {}) as Record<string, any>;
+            throw new Error(err.error || 'Erro ao salvar resposta.');
+          }
         }
       }
 
       setSavingStatus('saved');
-      setTimeout(() => setSavingStatus('idle'), 1000);
+      setTimeout(() => setSavingStatus('idle'), 800);
 
-      // Avançar etapa ou concluir
+      // Próxima etapa ou conclusão
       if (currentStepIndex < DIGITAL_CHECK_STEPS.length - 1) {
         setCurrentStepIndex((prev) => prev + 1);
+        // Rolar o corpo do modal suavemente para o topo ao avançar
+        const bodyEl = document.querySelector('.dc-body');
+        if (bodyEl) bodyEl.scrollTop = 0;
       } else {
-        completeCheck();
+        await completeDiagnostic();
       }
-    } catch {
+    } catch (err: unknown) {
       setSavingStatus('error');
-      setErrorMessage('Não conseguimos salvar este bloco. Verifique sua conexão e tente novamente.');
+      setErrorMessage(err instanceof Error ? err.message : 'Falha ao salvar progresso.');
     }
   };
 
-  // Finalização do check
-  const completeCheck = async () => {
+  // Conclusão e geração do diagnóstico
+  const completeDiagnostic = async () => {
     setPhase('analyzing');
 
     try {
@@ -203,32 +237,33 @@ export function DigitalCheckFlow({
           },
         });
 
-        if (res.ok) {
-          const data = (await res.json()) as Record<string, any>;
-          setRecommendations(data.recommendations || []);
-          setPrimaryOpportunity(data.primaryOpportunity || 'AUTOMATE');
+        if (!res.ok) {
+          const err = ((await res.json().catch(() => ({}))) || {}) as Record<string, any>;
+          throw new Error(err.error || 'Erro ao processar diagnóstico.');
         }
+
+        const data = (await res.json()) as Record<string, any>;
+        setRecommendations(data.recommendations || []);
+        setPrimaryOpportunity(data.primaryOpportunity || 'AUTOMATE');
       }
 
       setTimeout(() => {
         setPhase('result');
-      }, 1400);
-    } catch {
-      setTimeout(() => {
-        setPhase('result');
-      }, 1400);
+      }, 1000);
+    } catch (err: unknown) {
+      setErrorMessage(err instanceof Error ? err.message : 'Erro ao concluir diagnóstico.');
+      setPhase('questionnaire');
     }
   };
 
   const handleBack = () => {
     if (currentStepIndex > 0) {
-      setErrorMessage('');
       setCurrentStepIndex((prev) => prev - 1);
+      setErrorMessage('');
+      const bodyEl = document.querySelector('.dc-body');
+      if (bodyEl) bodyEl.scrollTop = 0;
     }
   };
-
-  // Formatação com dois dígitos
-  const stepNumberStr = `0${currentStepIndex + 1} / 05`;
 
   // -----------------------------------------------------------
   // TELA DE INTRODUÇÃO
@@ -236,23 +271,23 @@ export function DigitalCheckFlow({
   if (phase === 'intro') {
     return (
       <div className="dc-overlay">
-        <div className="dc-modal-shell" style={{ maxWidth: '640px' }}>
+        <div className="dc-modal-shell" style={{ maxWidth: '620px' }}>
           <header className="dc-header">
             <div className="dc-brand">
               !AI <span>DIGITAL CHECK</span>
             </div>
             {onExit && (
-              <button className="dc-exit-btn" type="button" onClick={onExit}>
+              <button className="dc-exit-btn" type="button" onClick={onExit} aria-label="Fechar">
                 Fechar ×
               </button>
             )}
           </header>
           <div className="dc-body">
             <div className="dc-intro-box">
-              <div className="dc-eyebrow">DIAGNÓSTICO EM 5 BLOCOS RÁPIDOS</div>
+              <div className="dc-eyebrow">DIAGNÓSTICO EM 5 ETAPAS RÁPIDAS</div>
               <h1 className="dc-title">Entendi. Vamos descobrir onde está o gargalo.</h1>
               <p className="dc-step-desc">
-                Organizamos a análise em 5 etapas práticas para mapear seus canais, rotina comercial e automações. Leva menos de 2 minutos.
+                Organizamos a análise em 5 perguntas práticas para mapear seus canais, rotina comercial e automações. Leva menos de 2 minutos.
               </p>
               <button
                 className="button"
@@ -304,13 +339,13 @@ export function DigitalCheckFlow({
 
     return (
       <div className="dc-overlay">
-        <div className="dc-modal-shell" style={{ maxWidth: '860px' }}>
+        <div className="dc-modal-shell" style={{ maxWidth: '820px' }}>
           <header className="dc-header">
             <div className="dc-brand">
               !AI <span>DIGITAL CHECK</span>
             </div>
             {onExit && (
-              <button className="dc-exit-btn" type="button" onClick={onExit}>
+              <button className="dc-exit-btn" type="button" onClick={onExit} aria-label="Voltar ao site">
                 Voltar ao site ×
               </button>
             )}
@@ -348,7 +383,7 @@ export function DigitalCheckFlow({
               <p>
                 Podemos transformar esse diagnóstico em um plano de ação concreto, com escopo e prazos claros para o seu negócio.
               </p>
-              <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', marginTop: '10px' }}>
+              <div className="dc-cta-actions">
                 <a className="button" href={whatsappUrl} target="_blank" rel="noopener noreferrer">
                   Quero conversar sobre isso <ArrowIcon />
                 </a>
@@ -366,9 +401,12 @@ export function DigitalCheckFlow({
   }
 
   // -----------------------------------------------------------
-  // QUESTIONÁRIO PROGRESSIVO (EM BLOCOS ORGANIZADOS: 01 / 05 a 05 / 05)
+  // QUESTIONÁRIO PROGRESSIVO LIMPO (01 / 05 a 05 / 05 - SEM BLOCOS)
   // -----------------------------------------------------------
   const progressPercent = ((currentStepIndex + 1) / DIGITAL_CHECK_STEPS.length) * 100;
+  const currentVal = answers[currentStep.key];
+  const selectedUrgency = String(answers.urgency || '3');
+  const activeUrgencyOption = URGENCY_SCALE_OPTIONS.find((o) => o.value === selectedUrgency) || URGENCY_SCALE_OPTIONS[2];
 
   return (
     <div className="dc-overlay">
@@ -384,7 +422,7 @@ export function DigitalCheckFlow({
             {savingStatus === 'error' && <span className="dc-saving-badge error">ERRO AO SALVAR</span>}
 
             {onExit && (
-              <button className="dc-exit-btn" type="button" onClick={onExit}>
+              <button className="dc-exit-btn" type="button" onClick={onExit} aria-label="Sair">
                 Sair
               </button>
             )}
@@ -394,8 +432,8 @@ export function DigitalCheckFlow({
         {/* Barra de Progresso Canônica em 5 Etapas */}
         <div className="dc-progress-wrapper">
           <div className="dc-progress-meta">
-            <span>ETAPA {stepNumberStr}</span>
-            <strong>{currentStep.title}</strong>
+            <span>ETAPA {currentStep.stepNumberStr}</span>
+            <strong className="dc-progress-label">{currentStep.eyebrow.split('•')[1]?.trim() || ''}</strong>
           </div>
           <div className="dc-progress-track">
             <div className="dc-progress-fill" style={{ width: `${progressPercent}%` }} />
@@ -409,149 +447,138 @@ export function DigitalCheckFlow({
             <p className="dc-step-desc">{currentStep.description}</p>
           </div>
 
-          {/* Renderização dos Blocos da Etapa */}
-          <div className="dc-blocks-container">
-            {currentStep.questions.map((q: QuestionDefinition, qIdx: number) => {
-              const val = answers[q.key];
-
-              return (
-                <div key={q.key} className="dc-block">
-                  <div className="dc-block-header">
-                    <h3 className="dc-block-title">
-                      <span className="dc-block-badge">Bloco {qIdx + 1}</span>
-                      {q.question}
-                    </h3>
-                    {q.description && <p className="dc-block-desc">{q.description}</p>}
-                    {q.context && <div className="dc-block-context">{q.context}</div>}
-                  </div>
-
-                  {/* Pergunta Single Choice */}
-                  {q.type === 'single' && (
-                    <div className="dc-grid-options" role="radiogroup">
-                      {q.options?.map((opt) => {
-                        const isSelected = val === opt.value;
-                        return (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            role="radio"
-                            aria-checked={isSelected}
-                            className={`dc-card-option single ${isSelected ? 'selected' : ''}`}
-                            onClick={() => handleSingleSelect(q.key, opt.value)}
-                          >
-                            <div className="dc-card-option-left">
-                              <div className="dc-opt-indicator">{isSelected && '•'}</div>
-                              <span>{opt.label}</span>
-                            </div>
-                            {opt.nexNote && <span className="dc-nex-tag">{opt.nexNote}</span>}
-                          </button>
-                        );
-                      })}
+          {/* Opções de Seleção Única */}
+          {currentStep.type === 'single' && (
+            <div className="dc-grid-options" role="radiogroup">
+              {currentStep.options?.map((opt) => {
+                const isSelected = currentVal === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
+                    className={`dc-card-option single ${isSelected ? 'selected' : ''}`}
+                    onClick={() => handleSingleSelect(currentStep.key, opt.value)}
+                  >
+                    <div className="dc-card-option-left">
+                      <div className="dc-opt-indicator">{isSelected && '•'}</div>
+                      <span>{opt.label}</span>
                     </div>
-                  )}
+                    {opt.nexNote && <span className="dc-nex-tag">{opt.nexNote}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
-                  {/* Pergunta Multiple Choice */}
-                  {q.type === 'multiple' && (
-                    <div className="dc-grid-options" role="group">
-                      {q.options?.map((opt) => {
-                        const isSelected = Array.isArray(val) && val.includes(opt.value);
-                        return (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            role="checkbox"
-                            aria-checked={isSelected}
-                            className={`dc-card-option ${isSelected ? 'selected' : ''}`}
-                            onClick={() => handleMultipleSelect(q.key, opt.value)}
-                          >
-                            <div className="dc-card-option-left">
-                              <div className="dc-opt-indicator">{isSelected && '✓'}</div>
-                              <span>{opt.label}</span>
-                            </div>
-                            {opt.nexNote && <span className="dc-nex-tag">{opt.nexNote}</span>}
-                          </button>
-                        );
-                      })}
-
-                      {/* Campo "Outro" quando selecionado */}
-                      {q.hasOther && Array.isArray(val) && val.includes('other') && (
-                        <div className="dc-other-box">
-                          <input
-                            type="text"
-                            className="dc-other-input"
-                            placeholder={q.otherPlaceholder || 'Descreva brevemente'}
-                            value={otherTexts[q.key] || ''}
-                            onChange={(e) =>
-                              setOtherTexts((prev) => ({
-                                ...prev,
-                                [q.key]: e.target.value,
-                              }))
-                            }
-                            maxLength={160}
-                          />
-                        </div>
-                      )}
+          {/* Opções de Seleção Múltipla */}
+          {currentStep.type === 'multiple' && (
+            <div className="dc-grid-options" role="group">
+              {currentStep.options?.map((opt) => {
+                const isSelected = Array.isArray(currentVal) && currentVal.includes(opt.value);
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="checkbox"
+                    aria-checked={isSelected}
+                    className={`dc-card-option ${isSelected ? 'selected' : ''}`}
+                    onClick={() => handleMultipleSelect(currentStep.key, opt.value)}
+                  >
+                    <div className="dc-card-option-left">
+                      <div className="dc-opt-indicator">{isSelected && '✓'}</div>
+                      <span>{opt.label}</span>
                     </div>
-                  )}
+                    {opt.nexNote && <span className="dc-nex-tag">{opt.nexNote}</span>}
+                  </button>
+                );
+              })}
 
-                  {/* Escala de Urgência (1 a 5) em Blocos Horizontais */}
-                  {q.type === 'scale' && (
-                    <div className="dc-scale-grid" role="radiogroup">
-                      {q.options?.map((opt) => {
-                        const isSelected = val === opt.value;
-                        return (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            role="radio"
-                            aria-checked={isSelected}
-                            className={`dc-scale-card ${isSelected ? 'selected' : ''}`}
-                            onClick={() => handleSingleSelect(q.key, opt.value)}
-                          >
-                            <span className="dc-scale-num">{opt.value}</span>
-                            <span className="dc-scale-label">{opt.label.replace(/^\d\s*—\s*/, '')}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Textarea de Gargalo Principal */}
-                  {q.type === 'textarea' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <textarea
-                        className="dc-textarea"
-                        rows={4}
-                        placeholder={q.placeholder}
-                        value={typeof val === 'string' ? val : ''}
-                        maxLength={q.maxLength || 1000}
-                        onChange={(e) => {
-                          setAnswers((prev) => ({
-                            ...prev,
-                            [q.key]: e.target.value,
-                          }));
-                          setErrorMessage('');
-                        }}
-                      />
-                      <div className="dc-char-count">
-                        {typeof val === 'string' ? val.length : 0} / {q.maxLength || 1000} caracteres
-                      </div>
-                    </div>
-                  )}
+              {/* Campo "Outro" quando selecionado */}
+              {currentStep.hasOther && Array.isArray(currentVal) && currentVal.includes('other') && (
+                <div className="dc-other-box">
+                  <input
+                    type="text"
+                    className="dc-other-input"
+                    placeholder={currentStep.otherPlaceholder || 'Descreva brevemente'}
+                    value={otherTexts[currentStep.key] || ''}
+                    onChange={(e) =>
+                      setOtherTexts((prev) => ({
+                        ...prev,
+                        [currentStep.key]: e.target.value,
+                      }))
+                    }
+                    maxLength={160}
+                  />
                 </div>
-              );
-            })}
-          </div>
+              )}
+            </div>
+          )}
+
+          {/* Etapa 5: Gargalo Principal + Escala de Urgência Integrada (sem blocos) */}
+          {currentStep.type === 'composite_bottleneck' && (
+            <div className="dc-bottleneck-section">
+              <div className="dc-textarea-wrapper">
+                <textarea
+                  className="dc-textarea"
+                  rows={4}
+                  placeholder="Conte sobre a tarefa, processo ou situação que mais toma tempo, gera retrabalho ou faz oportunidades se perderem."
+                  value={typeof answers.main_bottleneck === 'string' ? answers.main_bottleneck : ''}
+                  maxLength={1000}
+                  onChange={(e) => {
+                    setAnswers((prev) => ({
+                      ...prev,
+                      main_bottleneck: e.target.value,
+                    }));
+                    setErrorMessage('');
+                  }}
+                />
+                <div className="dc-char-count">
+                  {typeof answers.main_bottleneck === 'string' ? answers.main_bottleneck.length : 0} / 1000 caracteres
+                </div>
+              </div>
+
+              <div className="dc-urgency-wrapper">
+                <div className="dc-urgency-heading">
+                  <span className="dc-urgency-title">Quanto isso está atrapalhando sua operação hoje?</span>
+                  <span className="dc-urgency-status">
+                    Nível {activeUrgencyOption.num}: <strong>{activeUrgencyOption.label}</strong>
+                  </span>
+                </div>
+
+                <div className="dc-urgency-scale" role="radiogroup" aria-label="Escala de urgência de 1 a 5">
+                  {URGENCY_SCALE_OPTIONS.map((opt) => {
+                    const isSelected = selectedUrgency === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={isSelected}
+                        className={`dc-urgency-btn ${isSelected ? 'selected' : ''}`}
+                        onClick={() => handleSingleSelect('urgency', opt.value)}
+                        title={opt.label}
+                      >
+                        <span className="dc-urgency-num">{opt.num}</span>
+                        <span className="dc-urgency-btn-label">{opt.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Rodapé de Ações do Modal */}
+        {/* Rodapé Fixo de Ações do Modal */}
         <footer className="dc-footer">
           {currentStepIndex > 0 ? (
             <button className="dc-back-btn" type="button" onClick={handleBack}>
-              ← Bloco anterior
+              ← Voltar
             </button>
           ) : (
-            <div />
+            <div className="dc-footer-spacer" />
           )}
 
           {errorMessage && (
@@ -561,11 +588,10 @@ export function DigitalCheckFlow({
           )}
 
           <button
-            className="button"
+            className="button dc-continue-btn"
             type="button"
             onClick={saveAndAdvance}
             disabled={savingStatus === 'saving'}
-            style={{ padding: '14px 28px' }}
           >
             {savingStatus === 'saving'
               ? 'Salvando...'

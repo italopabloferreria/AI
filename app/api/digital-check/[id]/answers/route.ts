@@ -1,11 +1,24 @@
 import { NextResponse } from 'next/server';
-import { DIGITAL_CHECK_QUESTIONS } from '@/lib/digital-check/questions';
 import { verifyResumeToken } from '@/lib/digital-check/security';
 import { getRepository } from '@/lib/digital-check/storage';
 
-export async function PATCH(
+const VALID_QUESTION_KEYS = new Set([
+  'lead_sources',
+  'lead_handling',
+  'lead_organization',
+  'follow_up',
+  'manual_tasks',
+  'system_integration',
+  'website_function',
+  'website_and_tools',
+  'ai_opportunity',
+  'main_bottleneck',
+  'urgency',
+]);
+
+async function handleSaveAnswer(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  params: Promise<{ id: string }>
 ) {
   try {
     const { id } = await params;
@@ -32,8 +45,7 @@ export async function PATCH(
     const questionKey = String(body.questionKey || '').trim();
     const answerJson = body.answerJson;
 
-    const validQuestion = DIGITAL_CHECK_QUESTIONS.find((q) => q.key === questionKey);
-    if (!validQuestion) {
+    if (!VALID_QUESTION_KEYS.has(questionKey)) {
       return NextResponse.json({ error: 'Chave de pergunta inválida.' }, { status: 400 });
     }
 
@@ -53,7 +65,21 @@ export async function PATCH(
     });
   } catch (err: unknown) {
     // eslint-disable-next-line no-console
-    console.error('[PATCH /api/digital-check/[id]/answers error]:', err);
+    console.error('[answers route error]:', err);
     return NextResponse.json({ error: 'Falha ao salvar resposta. Tente novamente.' }, { status: 500 });
   }
+}
+
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  return handleSaveAnswer(request, params);
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  return handleSaveAnswer(request, params);
 }

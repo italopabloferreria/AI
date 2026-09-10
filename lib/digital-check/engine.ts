@@ -63,7 +63,10 @@ export function runDiagnosticEngine(
   }
 
   // 2. FOLLOW-UP (OPERATE + AUTOMATE)
-  const followUp = getString('follow_up');
+  let followUp = getString('follow_up');
+  if (!followUp && ['whatsapp', 'memory', 'no_place'].includes(leadOrg)) {
+    followUp = 'no_follow_up';
+  }
   if (['sometimes', 'usually_not', 'no_follow_up'].includes(followUp)) {
     categoryScores.OPERATE += 30;
     categoryScores.AUTOMATE += 20;
@@ -81,7 +84,11 @@ export function runDiagnosticEngine(
   }
 
   // 3. INTEGRAÇÃO ENTRE SISTEMAS (AUTOMATE)
-  const sysIntegration = getString('system_integration');
+  let sysIntegration = getString('system_integration');
+  const websiteTools = [...getArray('website_and_tools'), ...getArray('website_function')];
+  if (!sysIntegration && websiteTools.includes('mostly_manual')) {
+    sysIntegration = 'mostly_manual';
+  }
   if (['mostly_manual', 'isolated_islands'].includes(sysIntegration)) {
     categoryScores.AUTOMATE += 40;
     const reasonKeys = [`system_integration:${sysIntegration}`];
@@ -115,7 +122,7 @@ export function runDiagnosticEngine(
   }
 
   // 5. SITE E PRESENÇA DIGITAL (BUILD)
-  const websiteFunctions = getArray('website_function');
+  const websiteFunctions = websiteTools;
   const leadSources = getArray('lead_sources');
   const hasDigitalAcquisition = leadSources.some((s) => ['instagram', 'google', 'paid_ads', 'website'].includes(s));
   const siteIsPassive =
@@ -156,17 +163,19 @@ export function runDiagnosticEngine(
   }
 
   // 7. INTELIGÊNCIA ARTIFICIAL CONCRETA (INTELLIGENCE)
-  // Regra estrita: só recomenda INTELLIGENCE se houver interesse E necessidade plausível
-  const aiOpportunities = getArray('ai_opportunity').filter((o) => o !== 'no_idea');
+  const aiOpportunities = [
+    ...getArray('ai_opportunity').filter((o) => o !== 'no_idea'),
+    ...(websiteFunctions.includes('ai_interest') ? ['support', 'process_auto'] : []),
+  ];
   const hasConcreteNeed =
     manualTasks.includes('faq_reply') ||
-    manualTasks.includes('reports') ||
-    manualTasks.includes('data_transfer') ||
+    manualTasks.includes('proposals') ||
+    manualTasks.includes('copy_paste') ||
     getArray('lead_handling').includes('manual_reply') ||
     aiOpportunities.includes('support') ||
-    aiOpportunities.includes('data_analysis');
+    aiOpportunities.includes('process_auto');
 
-  if (aiOpportunities.length > 0 && hasConcreteNeed) {
+  if (aiOpportunities.length > 0 && (hasConcreteNeed || manualTasks.length >= 2)) {
     categoryScores.INTELLIGENCE += 30;
     const reasonKeys = [
       ...aiOpportunities.map((o) => `ai_interest:${o}`),
