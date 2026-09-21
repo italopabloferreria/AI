@@ -8,6 +8,7 @@ import { Enhancements } from './interactions';
 import NotFound from './not-found';
 import Sections from './sections';
 import { config as c } from './site.config';
+import CRMPage from './crm/page';
 
 export default function Home() {
   const [activeCheck, setActiveCheck] = useState<{
@@ -25,6 +26,17 @@ export default function Home() {
       window.location.pathname === '/digital-check' ||
       window.location.hash === '#digital-check';
     if (isDc) {
+      const hasSavedSession =
+        Boolean(sessionStorage.getItem('ai_dc_id')) &&
+        Boolean(sessionStorage.getItem('ai_dc_token'));
+
+      // A direct visit cannot create a session by itself. Send visitors through
+      // the lead form instead of opening a questionnaire that cannot be saved.
+      if (!hasSavedSession) {
+        window.location.replace('/#contato');
+        return;
+      }
+
       setIsDigitalCheckRoute(true);
       return;
     }
@@ -33,6 +45,10 @@ export default function Home() {
       setIsNotFoundRoute(true);
     }
   }, []);
+
+  if (typeof window !== 'undefined' && window.location.pathname === '/crm') {
+    return <CRMPage />;
+  }
 
   if (isNotFoundRoute) {
     return <NotFound />;

@@ -24,6 +24,18 @@
       "destination": "/api/_bridge?__route=/api/leads"
     },
     {
+      "source": "/api/crm/leads/:id",
+      "destination": "/api/_bridge?__route=/api/crm/leads/:id"
+    },
+    {
+      "source": "/api/crm/leads",
+      "destination": "/api/_bridge?__route=/api/crm/leads"
+    },
+    {
+      "source": "/api/crm/settings",
+      "destination": "/api/_bridge?__route=/api/crm/settings"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api/_bridge?__route=/api/:path*"
     },

@@ -155,6 +155,12 @@ npm run build:static
 
 ## 6. Como Estender o Diagnóstico
 
+## 7. CRM interno
+
+O painel administrativo está disponível em `/crm`. Ele lista os leads capturados pelo formulário, permite buscar e filtrar por etapa, mover leads no pipeline e consultar o Digital Check associado. Em desenvolvimento, a chave padrão é `admin123`; altere-a em **Configurações**. Em produção, defina `CRM_ADMIN_KEY` explicitamente e não use a chave padrão.
+
+Configure `CRM_ADMIN_KEY` com uma chave longa e aleatória antes de publicar. A mesma chave é enviada pelo navegador no cabeçalho `x-crm-admin-key`; em produção, sem essa variável, o acesso é bloqueado. A alteração pela tela é mantida apenas enquanto o processo estiver rodando; para persistência, atualize a variável no provedor e reinicie. As APIs administrativas são `GET/PATCH /api/crm/leads`, `GET /api/crm/leads/:id` e `GET/PATCH /api/crm/settings`.
+
 - **Novas Perguntas ou Opções**: Altere [`lib/digital-check/questions.ts`](lib/digital-check/questions.ts) e atualize as opções permitidas em [`lib/digital-check/validation.ts`](lib/digital-check/validation.ts).
 - **Regras de Recomendação**: Edite [`lib/digital-check/engine.ts`](lib/digital-check/engine.ts). Cada recomendação deve possuir um `recommendationKey` único para manter a idempotência.
 - **Integração com CRM**: Implemente a chamada para seu CRM em [`lib/services/crm.ts`](lib/services/crm.ts). O Digital Check despacha o payload de forma assíncrona após a transação de finalização.

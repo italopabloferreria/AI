@@ -35,6 +35,9 @@ export interface IDigitalCheckRepository {
   getAnswers(digitalCheckId: string): Promise<DigitalCheckAnswer[]>;
   saveRecommendations(digitalCheckId: string, recommendations: DigitalCheckRecommendation[]): Promise<void>;
   getRecommendations(digitalCheckId: string): Promise<DigitalCheckRecommendation[]>;
+  listCRMLeads(filters?: { search?: string; status?: string }): Promise<CRMLead[]>;
+  updateLeadStatus(leadId: string, status: CRMLeadStatus): Promise<Lead | null>;
+  getCRMLeadDetail(leadId: string): Promise<CRMLeadDetail | null>;
   completeDigitalCheckAtomic(
     digitalCheckId: string,
     engineCalculator: (answers: DigitalCheckAnswer[]) => DiagnosticResult
@@ -43,6 +46,16 @@ export interface IDigitalCheckRepository {
     recommendations: DigitalCheckRecommendation[];
     alreadyCompleted: boolean;
   }>;
+}
+
+export type CRMLeadStatus = 'created' | 'qualified' | 'contacted' | 'proposal' | 'won' | 'lost';
+export interface CRMLead {
+  lead: Lead;
+  digitalCheck?: Pick<DigitalCheck, 'id' | 'status' | 'score' | 'primaryOpportunity' | 'completedAt'>;
+}
+export interface CRMLeadDetail extends CRMLead {
+  answers: DigitalCheckAnswer[];
+  recommendations: DigitalCheckRecommendation[];
 }
 
 // Carrega variáveis de .env.local nativamente se disponível no Node.js
@@ -260,6 +273,73 @@ class PostgresRepository implements IDigitalCheckRepository {
     `;
     const res = await this.pool.query(query, [digitalCheckId]);
     return res.rows;
+  }
+
+  async listCRMLeads(filters: { search?: string; status?: string } = {}): Promise<CRMLead[]> {
+    const values: unknown[] = [];
+    const where: string[] = [];
+    if (filters.status) {
+      values.push(filters.status);
+      where.push(`l.status = $${values.length}`);
+    }
+    if (filters.search) {
+      values.push(`%${filters.search}%`);
+      where.push(`(l.name ILIKE $${values.length} OR l.company ILIKE $${values.length} OR l.email ILIKE $${values.length})`);
+    }
+    const query = `
+      SELECT l.id, l.name, l.company, l.email, l.whatsapp,
+             l.website_or_instagram as "websiteOrInstagram", l.initial_problem as "initialProblem",
+             l.consent, l.consent_at as "consentAt", l.privacy_policy_version as "privacyPolicyVersion",
+             l.source, l.status, l.created_at as "createdAt", l.updated_at as "updatedAt",
+             dc.id as "checkId", dc.status as "checkStatus", dc.score,
+             dc.primary_opportunity as "primaryOpportunity", dc.completed_at as "completedAt"
+      FROM leads l
+      LEFT JOIN LATERAL (
+        SELECT * FROM digital_checks WHERE lead_id = l.id ORDER BY created_at DESC LIMIT 1
+      ) dc ON true
+      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+      ORDER BY l.created_at DESC
+      LIMIT 200
+    `;
+    const res = await this.pool.query(query, values);
+    return res.rows.map((row) => ({
+      lead: {
+        id: row.id, name: row.name, company: row.company, email: row.email, whatsapp: row.whatsapp,
+        websiteOrInstagram: row.websiteOrInstagram, initialProblem: row.initialProblem,
+        consent: row.consent, consentAt: row.consentAt, privacyPolicyVersion: row.privacyPolicyVersion,
+        source: row.source, status: row.status, createdAt: row.createdAt, updatedAt: row.updatedAt,
+      },
+      digitalCheck: row.checkId ? {
+        id: row.checkId, status: row.checkStatus, score: row.score,
+        primaryOpportunity: row.primaryOpportunity, completedAt: row.completedAt,
+      } : undefined,
+    }));
+  }
+
+  async updateLeadStatus(leadId: string, status: CRMLeadStatus): Promise<Lead | null> {
+    const res = await this.pool.query(
+      `UPDATE leads SET status = $2, updated_at = NOW() WHERE id = $1
+       RETURNING id, name, company, email, whatsapp, website_or_instagram as "websiteOrInstagram",
+       initial_problem as "initialProblem", consent, consent_at as "consentAt",
+       privacy_policy_version as "privacyPolicyVersion", source, status,
+       created_at as "createdAt", updated_at as "updatedAt"`,
+      [leadId, status]
+    );
+    return res.rows[0] || null;
+  }
+
+  async getCRMLeadDetail(leadId: string): Promise<CRMLeadDetail | null> {
+    const lead = await this.getLead(leadId);
+    if (!lead) return null;
+    const checkRes = await this.pool.query(
+      `SELECT id, status, score, primary_opportunity as "primaryOpportunity", completed_at as "completedAt"
+       FROM digital_checks WHERE lead_id = $1 ORDER BY created_at DESC LIMIT 1`,
+      [leadId]
+    );
+    const check = checkRes.rows[0];
+    const answers = check ? await this.getAnswers(check.id) : [];
+    const recommendations = check?.status === 'completed' ? await this.getRecommendations(check.id) : [];
+    return { lead, digitalCheck: check, answers, recommendations };
   }
 
   // Finalização Atômica e Idempotente com Transação Real e Row Lock (ITEM 10)
@@ -529,6 +609,39 @@ class InMemoryRepository implements IDigitalCheckRepository {
 
   async getRecommendations(digitalCheckId: string): Promise<DigitalCheckRecommendation[]> {
     return this.recommendations.get(digitalCheckId) || [];
+  }
+
+  async listCRMLeads(filters: { search?: string; status?: string } = {}): Promise<CRMLead[]> {
+    const search = filters.search?.toLowerCase();
+    return Array.from(this.leads.values())
+      .filter((lead) => !filters.status || lead.status === filters.status)
+      .filter((lead) => !search || [lead.name, lead.company, lead.email].some((value) => value.toLowerCase().includes(search)))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, 200)
+      .map((lead) => {
+        const check = Array.from(this.checks.values()).filter((item) => item.leadId === lead.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+        return { lead, digitalCheck: check && { id: check.id, status: check.status, score: check.score, primaryOpportunity: check.primaryOpportunity, completedAt: check.completedAt } };
+      });
+  }
+
+  async updateLeadStatus(leadId: string, status: CRMLeadStatus): Promise<Lead | null> {
+    const lead = this.leads.get(leadId);
+    if (!lead) return null;
+    lead.status = status;
+    lead.updatedAt = new Date().toISOString();
+    return lead;
+  }
+
+  async getCRMLeadDetail(leadId: string): Promise<CRMLeadDetail | null> {
+    const lead = this.leads.get(leadId);
+    if (!lead) return null;
+    const check = Array.from(this.checks.values()).find((item) => item.leadId === leadId);
+    return {
+      lead,
+      digitalCheck: check && { id: check.id, status: check.status, score: check.score, primaryOpportunity: check.primaryOpportunity, completedAt: check.completedAt },
+      answers: check ? await this.getAnswers(check.id) : [],
+      recommendations: check ? await this.getRecommendations(check.id) : [],
+    };
   }
 
   async completeDigitalCheckAtomic(
