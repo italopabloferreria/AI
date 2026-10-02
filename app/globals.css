@@ -1,6 +1,12 @@
-@import 'tailwindcss';
+@import 'tailwindcss' source(none);
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
+@source '.';
+@source '../components/ui/checkbox.tsx';
+@source not '../icantbelievecrm';
+@source not '../work';
+@source not '../build';
+@source not '../dist';
 .arrow-icon{display:inline-block;width:1em;height:1em;flex:none;vertical-align:-.125em;overflow:visible}
 @theme inline{--color-background:var(--background);--color-foreground:var(--foreground);--color-primary:var(--primary);--color-primary-foreground:var(--primary-foreground);--color-input:var(--input);--color-ring:var(--ring);--color-popover:var(--popover);--color-popover-foreground:var(--foreground)}
 :root,.dark{--background:#0A0A0B;--foreground:#F5F3ED;--primary:#D8FF3E;--primary-foreground:#0A0A0B;--input:#777;--ring:#3F5BFF;--popover:#161617;--carbon:#0A0A0B;--bone:#F5F3ED;--acid:#D8FF3E;--lime:#D8FF3E;--cobalt:#3F5BFF;--mist:#DADADA;--muted:#A1A19B}

@@ -26,10 +26,26 @@
     {
       "source": "/api/:path*",
       "destination": "/api/_bridge?__route=/api/:path*"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/assets/:path*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
     },
     {
-      "source": "/((?!api/).*)",
-      "destination": "/index.html"
+      "source": "/(hero-nex-640.webp|hero-nex-1440.webp|nex-standing-320.webp|nex-standing-640.webp|og-image.webp)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
+        }
+      ]
     }
   ]
 }

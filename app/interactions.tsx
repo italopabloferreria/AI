@@ -3,6 +3,8 @@ import { ArrowIcon } from './arrow-icon';
 import { useEffect, useRef, useState } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { config } from './site.config';
+import { requestWithTimeout } from '../lib/client-request';
+import { emitSiteEvent } from '../lib/site-events';
 
 export function Briefing({
   onStartCheck,
@@ -17,6 +19,7 @@ export function Briefing({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const existingLeadIdRef = useRef<string | null>(null);
+  const startedRef=useRef(false);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -51,13 +54,14 @@ export function Briefing({
       return;
     }
 
+    if(loading) return;
     setLoading(true);
 
     try {
       // 1. Salvar lead no backend antes de iniciar o questionário (evita duplicatas em retry com ref)
       let leadId = existingLeadIdRef.current;
       if (!leadId) {
-        const leadRes = await fetch('/api/leads', {
+        const leadRes = await requestWithTimeout('/api/leads', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -79,10 +83,11 @@ export function Briefing({
         const leadJson = (await leadRes.json()) as { leadId: string };
         leadId = leadJson.leadId;
         existingLeadIdRef.current = leadId;
+        emitSiteEvent("lead_saved");
       }
 
       // 2. Criar sessão de Digital Check com resume token seguro
-      const checkRes = await fetch('/api/digital-check', {
+      const checkRes = await requestWithTimeout('/api/digital-check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ leadId }),
@@ -98,10 +103,10 @@ export function Briefing({
         resumeToken: string;
       };
 
+      emitSiteEvent("diagnostic_started");
       // 3. Salvar temporariamente na sessionStorage para tolerância a refresh
       if (typeof window !== 'undefined') {
-        sessionStorage.setItem('ai_dc_id', digitalCheckId);
-        sessionStorage.setItem('ai_dc_token', resumeToken);
+        try { sessionStorage.setItem('ai_dc_id', digitalCheckId); sessionStorage.setItem('ai_dc_token', resumeToken); } catch { if(!onStartCheck) throw new Error('Abra a página do diagnóstico para continuar ou fale pelo WhatsApp.'); }
       }
 
       // 4. Transição fluida para o fluxo de diagnóstico
@@ -113,13 +118,14 @@ export function Briefing({
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Não conseguimos salvar seu Digital Check. Tente novamente.';
       setError(msg);
+      emitSiteEvent("form_error");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <form onSubmit={submit} className="briefing">
+    <form onSubmit={submit} className="briefing" onFocus={()=>{if(!startedRef.current){startedRef.current=true;emitSiteEvent("form_start");}}} aria-describedby="briefing-help" aria-busy={loading}>
       {/* Honeypot acessível para detecção de bots sem display:none (ITEM 27) */}
       <div
         style={{
@@ -166,12 +172,11 @@ export function Briefing({
           />
         </label>
         <label>
-          E-mail profissional
+          E-mail <small>(opcional)</small>
           <input
             name="email"
             autoComplete="email"
             type="email"
-            required
             maxLength={254}
             placeholder="voce@empresa.com.br"
           />
@@ -215,17 +220,18 @@ export function Briefing({
 
       <label className="consent">
         <Checkbox
+          required
           checked={consent}
           onCheckedChange={(v) => setConsent(v === true)}
           aria-label="Autorizo o tratamento das informações para meu diagnóstico"
         />
         <span>
           Autorizo o tratamento das informações enviadas para preparação do meu Digital Check e contato sobre o diagnóstico. Li a{' '}
-          <a href="#privacidade">Política de Privacidade</a>.
+          <a href="/privacidade" target="_blank" rel="noopener noreferrer">Política de Privacidade (abre em nova aba)</a>.
         </span>
       </label>
 
-      {error && <p className="form-error" role="alert">{error}</p>}
+      {error && <div className="form-error" role="alert"><p>{error}</p><a href={`https://wa.me/${config.contact.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">Conversar pelo WhatsApp</a></div>}
 
       <button className="button" type="submit" disabled={loading}>
         {loading ? 'Preparando...' : 'Preparar meu Digital Check'} <ArrowIcon />
@@ -240,6 +246,13 @@ export function Briefing({
 
 export function Enhancements() {
   const [open, setOpen] = useState(false);
+  const menuButton=useRef<HTMLButtonElement>(null);
+  useEffect(()=>{
+    if(!open) return;
+    const close=(event:KeyboardEvent)=>{if(event.key==='Escape'){setOpen(false);menuButton.current?.focus();}};
+    document.addEventListener('keydown',close);
+    return()=>document.removeEventListener('keydown',close);
+  },[open]);
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) =>
@@ -258,6 +271,7 @@ export function Enhancements() {
   return (
     <div className="mobile-menu">
       <button
+        ref={menuButton}
         aria-expanded={open}
         aria-controls="mobile-nav"
         onClick={() => setOpen(!open)}

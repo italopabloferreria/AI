@@ -2,67 +2,23 @@
 
 import { ArrowIcon } from './arrow-icon';
 import { useEffect, useState } from 'react';
-import { DigitalCheckFlow } from './digital-check/digital-check-flow';
+import { DiagnosticEntry } from './diagnostic-entry';
+import { PrivacyPage, PublicPage, publicPages } from './public-pages';
 import Hero from './hero';
 import { Enhancements } from './interactions';
 import NotFound from './not-found';
 import Sections from './sections';
 import { config as c } from './site.config';
+import {emitSiteEvent} from '../lib/site-events';
 
-export default function Home() {
-  const [activeCheck, setActiveCheck] = useState<{
-    id: string;
-    token: string;
-    lead: { name: string; company: string; websiteOrInstagram?: string };
-  } | null>(null);
-
-  const [isDigitalCheckRoute, setIsDigitalCheckRoute] = useState(false);
-  const [isNotFoundRoute, setIsNotFoundRoute] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const isDc =
-      window.location.pathname === '/digital-check' ||
-      window.location.hash === '#digital-check';
-    if (isDc) {
-      setIsDigitalCheckRoute(true);
-      return;
-    }
-    const path = window.location.pathname;
-    if (path && path !== '/' && path !== '/index.html' && !path.startsWith('/api')) {
-      setIsNotFoundRoute(true);
-    }
-  }, []);
-
-  if (isNotFoundRoute) {
-    return <NotFound />;
-  }
-
-  // Se o Digital Check estiver ativo via submissão do formulário ou rota direta
-  if (activeCheck) {
-    return (
-      <DigitalCheckFlow
-        initialCheckId={activeCheck.id}
-        initialResumeToken={activeCheck.token}
-        initialLead={activeCheck.lead}
-        onExit={() => setActiveCheck(null)}
-      />
-    );
-  }
-
-  if (isDigitalCheckRoute) {
-    return (
-      <DigitalCheckFlow
-        onExit={() => {
-          setIsDigitalCheckRoute(false);
-          if (window.location.pathname === '/digital-check') {
-            window.history.pushState(null, '', '/');
-          }
-        }}
-      />
-    );
-  }
-
+export default function Home({initialPath='/'}:{initialPath?:string}) {
+  const [hashCheck,setHashCheck]=useState(false);
+  useEffect(()=>{const listener=(event:MouseEvent)=>{const link=(event.target as Element)?.closest?.('a'); const href=link?.getAttribute('href')||''; const channel=href.startsWith('https://wa.me/')?'whatsapp':href.startsWith('mailto:')?'email':href.startsWith('tel:')?'phone':href==='/digital-check'?'diagnostic':null;if(channel)emitSiteEvent('cta_click',{channel});};document.addEventListener('click',listener);return()=>document.removeEventListener('click',listener);},[]);
+  useEffect(()=>{if(window.location.hash==='#digital-check') setHashCheck(true);},[]);
+  if(initialPath === '/privacidade') return <PrivacyPage />;
+  if(initialPath in publicPages) return <PublicPage path={initialPath as keyof typeof publicPages} />;
+  if(initialPath === '/digital-check' || hashCheck) return <DiagnosticEntry />;
+  if(!['/','/index.html'].includes(initialPath)) return <NotFound />;
   return (
     <main id="inicio">
       <a className="skip" href="#servicos">
@@ -78,7 +34,7 @@ export default function Home() {
             para negócios
           </span>
         </a>
-        <nav>
+        <nav aria-label="Navegação principal">
           {c.nav.map(([label, id]) => (
             <a key={id} href={'#' + id}>
               {label}
@@ -106,17 +62,13 @@ export default function Home() {
                 </span>
                 <h3>{name}.</h3>
                 <p>{desc}</p>
-                <small>{items}</small>
+                <small>{items}</small><a className="text-link" href={i===0?'/servicos/sites':i===3?'/crm':'/servicos/automacoes'}>Conhecer a solução <ArrowIcon /></a>
               </article>
             ))}
           </div>
         </div>
       </section>
-      <Sections
-        onStartCheck={(id, token, lead) => {
-          setActiveCheck({ id, token, lead });
-        }}
-      />
+      <Sections />
     </main>
   );
 }

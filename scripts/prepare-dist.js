@@ -29,4 +29,6 @@ if (fs.existsSync(buildDir)) {
   }
 }
 
+// Publish prerendered routes, discovery files and media as well as the entry point.
+if (fs.existsSync(buildDir)) fs.cpSync(buildDir, distClientDir, { recursive: true });
 console.log('[prepare-dist] Preparação do diretório de publicação concluída com sucesso.');

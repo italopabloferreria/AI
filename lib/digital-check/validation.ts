@@ -142,7 +142,7 @@ export function validateCreateLeadPayload(
   if (company.length < 2) {
     return { valid: false, error: 'Por favor, informe o nome da sua empresa (mínimo 2 caracteres).', status: 400 };
   }
-  if (!isValidEmail(email)) {
+  if (email && !isValidEmail(email)) {
     return { valid: false, error: 'Informe um endereço de e-mail válido.', status: 400 };
   }
   const cleanDigits = whatsapp.replace(/\D/g, '');

@@ -10,6 +10,8 @@ import type {
   QuestionDefinition,
 } from '@/lib/digital-check/types';
 import { config } from '../site.config';
+import { requestWithTimeout } from '../../lib/client-request';
+import { emitSiteEvent } from '../../lib/site-events';
 
 interface FlowProps {
   initialCheckId?: string;
@@ -46,9 +48,16 @@ export function DigitalCheckFlow({
 
   const [savingStatus, setSavingStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [restoring,setRestoring]=useState(Boolean(initialCheckId));
 
   const [recommendations, setRecommendations] = useState<DigitalCheckRecommendation[]>([]);
   const [primaryOpportunity, setPrimaryOpportunity] = useState<Category>('AUTOMATE');
+  useEffect(() => {
+    const heading=document.querySelector<HTMLElement>('.dc-title');
+    heading?.focus({preventScroll:true});
+    const body=document.querySelector('.dc-body');
+    if(body) body.scrollTop=0;
+  },[phase,currentStepIndex]);
 
   // Restauração de sessão via sessionStorage ou parâmetros (PostgreSQL como fonte da verdade - ITEM 2 e 35)
   useEffect(() => {
@@ -61,7 +70,7 @@ export function DigitalCheckFlow({
       setDigitalCheckId(storedId);
       setResumeToken(storedToken);
 
-      fetch(`/api/digital-check/${storedId}`, {
+      requestWithTimeout(`/api/digital-check/${storedId}`, {
         headers: { 'x-resume-token': storedToken },
       })
         .then(async (res) => {
@@ -93,9 +102,7 @@ export function DigitalCheckFlow({
             }
           }
         })
-        .catch(() => {
-          // Em falha de restauração, mantém o estado padrão limpo
-        });
+        .catch(() => { setErrorMessage('Não conseguimos retomar sua sessão. Tente recarregar ou volte ao site para falar com a gente.'); }).finally(()=>setRestoring(false));
     }
   }, [initialCheckId, initialResumeToken]);
 
@@ -158,6 +165,8 @@ export function DigitalCheckFlow({
       }
     }
 
+    if(savingStatus === 'saving' || restoring) return;
+    if(!digitalCheckId || !resumeToken) { setErrorMessage('Sua sessão não está disponível. Volte ao site para preparar um novo diagnóstico.'); return; }
     setErrorMessage('');
     setSavingStatus('saving');
 
@@ -176,7 +185,7 @@ export function DigitalCheckFlow({
         // Calcula a próxima etapa (1 a 10)
         const nextStepToPersist = Math.min(TOTAL_STEPS, currentStepIndex + 2);
 
-        const res = await fetch(`/api/digital-check/${digitalCheckId}/answers`, {
+        const res = await requestWithTimeout(`/api/digital-check/${digitalCheckId}/answers`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -196,6 +205,7 @@ export function DigitalCheckFlow({
       }
 
       setSavingStatus('saved');
+      emitSiteEvent('diagnostic_step_saved',{step:currentStepIndex+1});
       setTimeout(() => setSavingStatus('idle'), 600);
 
       // Avança para a próxima etapa ou finaliza
@@ -216,11 +226,12 @@ export function DigitalCheckFlow({
 
   // Finalização do diagnóstico via POST /complete atômico
   const completeDiagnostic = async () => {
+    if(!digitalCheckId || !resumeToken) { setErrorMessage('Sua sessão não está disponível. Volte ao site para preparar um novo diagnóstico.'); return; }
     setPhase('analyzing');
 
     try {
       if (digitalCheckId && resumeToken) {
-        const res = await fetch(`/api/digital-check/${digitalCheckId}/complete`, {
+        const res = await requestWithTimeout(`/api/digital-check/${digitalCheckId}/complete`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -236,6 +247,7 @@ export function DigitalCheckFlow({
         const data = (await res.json()) as Record<string, any>;
         setRecommendations(data.recommendations || []);
         setPrimaryOpportunity(data.primaryOpportunity || 'AUTOMATE');
+        emitSiteEvent('diagnostic_completed');
       }
 
       setTimeout(() => {
@@ -276,17 +288,19 @@ export function DigitalCheckFlow({
           <div className="dc-body">
             <div className="dc-intro-box">
               <div className="dc-eyebrow">DIAGNÓSTICO EM 10 ETAPAS RÁPIDAS</div>
-              <h1 className="dc-title">Entendi. Vamos descobrir onde está o gargalo.</h1>
+              <h1 className="dc-title" tabIndex={-1}>Entendi. Vamos descobrir onde está o gargalo.</h1>
               <p className="dc-step-desc">
-                Organizamos a análise em 10 perguntas práticas para mapear seus canais, rotina comercial e automações. Leva menos de 2 minutos.
+                Organizamos a análise em dez perguntas para mapear seus canais, rotina comercial e tarefas manuais. Suas respostas são salvas conforme você avança.
               </p>
+              {errorMessage && <div role="alert" className="dc-error-msg"><p>{errorMessage}</p><button type="button" className="text-button" onClick={()=>{try{sessionStorage.removeItem('ai_dc_id');sessionStorage.removeItem('ai_dc_token');}catch{} window.location.assign('/digital-check');}}>Preparar um novo diagnóstico</button></div>}
               <button
                 className="button"
                 type="button"
+                disabled={Boolean(errorMessage) || restoring}
                 onClick={() => setPhase('questionnaire')}
                 style={{ padding: '16px 32px', fontSize: '15px', marginTop: '12px' }}
               >
-                Começar Digital Check <ArrowIcon />
+                {restoring?'Carregando sua sessão…':'Começar Digital Check'} <ArrowIcon />
               </button>
             </div>
           </div>
@@ -304,8 +318,8 @@ export function DigitalCheckFlow({
         <div className="dc-modal-shell" style={{ maxWidth: '580px' }}>
           <div className="dc-body">
             <div className="dc-complete-card">
-              <div className="dc-complete-badge">DIAGNÓSTICO CONCLUÍDO ✓</div>
-              <h2 className="dc-title">Encontrei alguns pontos importantes.</h2>
+              <div className="dc-complete-badge">PREPARANDO SEU DIAGNÓSTICO</div>
+              <h1 className="dc-title" tabIndex={-1}>Preparando suas prioridades.</h1>
               <p className="dc-step-desc">
                 Cruzando suas respostas com as quatro frentes da nossa engenharia...
               </p>
@@ -353,7 +367,7 @@ export function DigitalCheckFlow({
           <div className="dc-body">
             <div className="dc-step-header">
               <div className="dc-eyebrow">DIAGNÓSTICO CONCLUÍDO</div>
-              <h1 className="dc-title">
+              <h1 className="dc-title" tabIndex={-1}>
                 Encontramos {count} {count === 1 ? 'oportunidade' : 'oportunidades'} na sua operação.
               </h1>
               <p className="dc-step-desc">
@@ -413,7 +427,7 @@ export function DigitalCheckFlow({
             !AI <span>DIGITAL CHECK</span>
           </div>
 
-          <div className="dc-status-bar">
+          <div className="dc-status-bar" aria-live="polite">
             {savingStatus === 'saving' && <span className="dc-saving-badge">SALVANDO...</span>}
             {savingStatus === 'saved' && <span className="dc-saving-badge saved">SALVO ✓</span>}
             {savingStatus === 'error' && <span className="dc-saving-badge error">ERRO AO SALVAR</span>}
@@ -434,7 +448,7 @@ export function DigitalCheckFlow({
               {currentQuestion.eyebrow.split('•')[1]?.trim() || ''}
             </strong>
           </div>
-          <div className="dc-progress-track">
+          <div className="dc-progress-track" role="progressbar" aria-label="Progresso do diagnóstico" aria-valuemin={0} aria-valuemax={TOTAL_STEPS} aria-valuenow={currentStepIndex + 1}>
             <div className="dc-progress-fill" style={{ width: `${progressPercent}%` }} />
           </div>
         </div>
@@ -442,7 +456,7 @@ export function DigitalCheckFlow({
         <div className="dc-body">
           <div className="dc-step-header">
             <div className="dc-eyebrow">{currentQuestion.eyebrow}</div>
-            <h2 className="dc-title">{currentQuestion.question}</h2>
+            <h1 className="dc-title" tabIndex={-1}>{currentQuestion.question}</h1>
             {currentQuestion.description && (
               <p className="dc-step-desc">{currentQuestion.description}</p>
             )}

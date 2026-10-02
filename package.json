@@ -7,11 +7,11 @@
   },
   "scripts": {
     "dev": "vinext dev",
-    "build": "vinext build && vite build --config vite.static.config.ts && node scripts/prepare-dist.js",
+    "build": "vinext build && vite build --config vite.static.config.ts && node scripts/run-prerender.mjs && node scripts/prepare-dist.js",
     "start": "wrangler dev --config dist/server/wrangler.json",
     "lint": "oxlint",
     "format": "oxfmt",
-    "build:static": "vite build --config vite.static.config.ts",
+    "build:static": "vite build --config vite.static.config.ts && node scripts/run-prerender.mjs",
     "preview:static": "vite preview --config vite.static.config.ts",
     "typecheck": "tsc --noEmit"
   },
