@@ -7,6 +7,7 @@ export default function Hero() {
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
     const preference = window.matchMedia('(prefers-reduced-motion: reduce)');
+    if(!preference.matches){setLoaded(true);setPlaying(true);}
     const pause = () => { video.current?.pause(); setPlaying(false); };
     const visibility = () => { if (document.hidden) pause(); };
     const observer = new IntersectionObserver(([entry]) => { if (!entry.isIntersecting) pause(); });
@@ -22,12 +23,10 @@ export default function Hero() {
       <img src="/hero-nex-1440.webp" srcSet="/hero-nex-640.webp 640w, /hero-nex-1440.webp 1440w" sizes="100vw" width="1440" height="804" alt="" fetchPriority="high" />
       <video ref={video} muted loop playsInline preload="none" tabIndex={-1} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onError={() => setPlaying(false)} style={{ opacity: loaded && playing ? 1 : 0 }}>{loaded && <source src="/hero-loop.mp4" type="video/mp4" />}</video>
     </div>
-    <div className="cinema-copy wrap"><div className="eyebrow">!AI / TECNOLOGIA PARA NEGÓCIOS</div>
-      <h1 id="hero-title">Sites, CRM e automações.<br /><span>Uma operação mais simples.</span></h1>
-      <p>Para clínicas e empresas de serviços que querem conectar captação, atendimento e acompanhamento — com menos tarefas manuais.</p>
-      <a className="button" href="/digital-check">Enviar meu briefing <ArrowIcon /></a>
-      <a className="hero-secondary" href="#contato">Conversar sobre um projeto</a>
-      <p className="hero-motto">Durma enquanto as ferramentas trabalham.</p>
+    <div className="cinema-copy wrap"><div className="eyebrow">I CAN’T BELIEVE IT’S AI / TECNOLOGIA PARA NEGÓCIOS</div>
+      <h1 id="hero-title">Durma enquanto<br />as ferramentas<br /><span>trabalham.</span></h1>
+      <p>Sites, sistemas e automações<br />para o seu negócio.</p>
+      <a className="button" href="#contato">Vamos conversar <ArrowIcon /></a>
     </div>
     <div className="cinema-controls"><a href="#servicos">Ver serviços <ArrowIcon direction="down" /></a><button type="button" className="text-button" onClick={toggle} aria-pressed={playing}>{playing ? 'Pausar animação' : 'Reproduzir animação'}</button></div>
   </section>;

@@ -11,7 +11,6 @@ export function ContactBriefing() {
     event.preventDefault();
     if(submitting.current) return;
     const data=new FormData(event.currentTarget);
-    if(data.get('_gotcha')) {setError('Não foi possível enviar. Tente novamente.');return;}
     if(!String(data.get('whatsapp')||'').trim()&&!String(data.get('email')||'').trim()){setError('Informe WhatsApp ou e-mail para podermos responder.');return;}
     submitting.current=true;setLoading(true);setError('');
     try {
@@ -23,7 +22,6 @@ export function ContactBriefing() {
   }
   return <form action={endpoint} method="POST" onSubmit={submit} className="briefing" aria-busy={loading} aria-describedby="briefing-help">
     <input type="hidden" name="_subject" value="Nova solicitação de consultoria — ICB AI"/>
-    <div aria-hidden="true" style={{position:'absolute',width:0,height:0,overflow:'hidden'}}><label>Deixe em branco<input name="_gotcha" tabIndex={-1} autoComplete="off"/></label></div>
     <div className="form-grid">
       <label>Seu nome<input name="name" required minLength={2} maxLength={120} autoComplete="name"/></label>
       <label>Empresa <small>(opcional)</small><input name="company" maxLength={160} autoComplete="organization"/></label>
