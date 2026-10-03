@@ -16,3 +16,7 @@ Arquitetura: preservar React/Vite e APIs atuais; publicar HTML pré-renderizado 
 Critérios: nenhuma prova social inventada; contato configurado exclusivamente para links de contato; nenhum envio real de mensagens; testes de dados em memória e sem banco de produção; não apresentar métricas de campo sem medição.
 
 Verificação concluída: build completo, typecheck e regressão local passaram; browser confirmou início sem e-mail, salvamento e recarga, foco e menu por teclado. Publicação em produção e dados comerciais reais permanecem pendentes, discriminados no relatório de entrega.
+
+## Atualização de posicionamento comercial
+
+Removidos os planos de CRM e todos os valores públicos da página inicial e das páginas de serviços. A navegação agora leva à consultoria, que explica o diagnóstico da operação, a definição de prioridades e a proposta sob medida. O CRM apresenta recursos e usos, sem pacotes comerciais. Investimentos são apresentados na consultoria.

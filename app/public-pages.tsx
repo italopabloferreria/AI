@@ -5,19 +5,19 @@ export const publicPages = {
     ['O que podemos construir', 'Landing pages para uma oferta específica, sites institucionais, e-commerce e sistemas para processos do seu negócio. A proposta define páginas, recursos, conteúdo e integrações antes do desenvolvimento.'],
     ['O que muda entre os projetos', 'Uma landing page reúne uma oferta em uma página. Um site institucional organiza serviços, empresa e contato em páginas próprias. Área restrita, catálogo e integrações aumentam o escopo.'],
     ['Como a entrega acontece', 'Alinhamos objetivo, materiais necessários, etapas e critérios de aceite. A entrega inclui testes e orientação conforme a proposta. Domínio, hospedagem, manutenção e serviços externos são discriminados separadamente.'],
-    ['Referências de investimento', 'Landing page simples a partir de R$ 1.490; site institucional básico a partir de R$ 2.490. Prazo e preço final dependem das entregas e integrações.'],
+    ['Uma proposta para seu projeto', 'Na consultoria, alinhamos objetivo, páginas, conteúdo e integrações. Você recebe uma proposta com entregas, prazo e investimento de acordo com o que seu negócio precisa.'],
   ] },
   '/servicos/automacoes': { title: 'Automações e integrações para sua operação', description: 'Conecte sistemas e reduza tarefas manuais com automações, integrações e IA aplicada. Conheça a abordagem da !AI.', intro: 'Menos copiar e colar. Mais informação chegando ao lugar certo.', sections: [
     ['Onde começar', 'Mapeamos tarefas repetidas e pontos em que informações se perdem. Priorizamos um fluxo com objetivo e resultado observável antes de expandir.'],
     ['Exemplos de aplicação', 'Organizar contatos recebidos, lembrar acompanhamentos, conectar formulários ao CRM e consolidar informações para relatórios. Cada integração depende dos recursos e permissões dos sistemas envolvidos.'],
     ['IA quando ela ajuda', 'Assistentes, classificação de informações e apoio à análise entram no escopo quando fizerem sentido. Definimos limites e revisão humana para decisões que exigem responsabilidade.'],
-    ['Escopo e custos', 'Integrações a partir de R$ 600 e automação simples a partir de R$ 800. Viabilidade, volume, APIs, manutenção e custos externos são avaliados na proposta.'],
+    ['Definir o próximo passo', 'A consultoria avalia viabilidade, volume, APIs e manutenção para priorizar um fluxo útil à sua operação. Os valores e os serviços externos necessários são apresentados na proposta.'],
   ] },
-  '/crm': { title: '!AI CRM: contatos, funil e acompanhamento', description: 'Conheça os planos !AI CRM e os pontos a definir na implantação: equipe, suporte, integrações e custos adicionais.', intro: 'Seu comercial com memória: contatos organizados e oportunidades acompanhadas.', sections: [
-    ['Essencial — R$ 697/mês', 'Centralização de contatos, funil comercial e tarefas de acompanhamento. Um ponto de partida para organizar o relacionamento comercial.'],
-    ['Gestão — R$ 997/mês', 'Inclui os recursos do Essencial, organização da operação comercial e relatórios e indicadores de gestão.'],
-    ['Automação — R$ 1.497/mês', 'Inclui os recursos de Gestão, fluxos automatizados definidos no escopo e integrações conforme viabilidade.'],
-    ['O que precisa constar na proposta', 'Quantidade de usuários, canais, volume, migração, treinamento, suporte, implantação e integrações. Os valores mensais não incluem automaticamente APIs, WhatsApp, IA ou serviços de terceiros. A implantação é cobrada separadamente.'],
+  '/crm': { title: '!AI CRM: contatos, funil e acompanhamento', description: 'Conheça o !AI CRM e defina na consultoria como organizar contatos, funil, equipe, acompanhamento e integrações.', intro: 'Seu comercial com memória: contatos organizados e oportunidades acompanhadas.', sections: [
+    ['Contatos e oportunidades', 'Centralização de contatos, funil comercial e tarefas de acompanhamento. Um ponto de partida para organizar o relacionamento comercial.'],
+    ['Acompanhamento e gestão', 'Organize tarefas da equipe, acompanhe oportunidades e defina relatórios e indicadores úteis para sua operação comercial.'],
+    ['Automações e integrações', 'Conecte etapas do processo e reduza tarefas repetidas com fluxos definidos no escopo e integrações conforme viabilidade.'],
+    ['O que precisa constar na proposta', 'Quantidade de usuários, canais, volume, migração, treinamento, suporte, implantação e integrações. Na consultoria, apresentamos o investimento para implantação e operação, com os serviços externos necessários discriminados na proposta.'],
     ['Antes de contratar', 'Solicite uma apresentação do fluxo que sua equipe precisa usar. A conversa verifica a adequação da solução e esclarece recursos e limites antes de fechar o escopo.'],
   ] },
   '/clinicas': { title: 'Sites, CRM e automações para clínicas', description: 'Conecte presença digital, atendimento e acompanhamento de contatos da clínica. Conheça a abordagem de tecnologia da !AI.', intro: 'Da primeira mensagem ao próximo atendimento, sem informação perdida pelo caminho.', sections: [
