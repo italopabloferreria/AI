@@ -25,7 +25,7 @@ export default function Hero() {
     <div className="cinema-copy wrap"><div className="eyebrow">!AI / TECNOLOGIA PARA NEGÓCIOS</div>
       <h1 id="hero-title">Sites, CRM e automações.<br /><span>Uma operação mais simples.</span></h1>
       <p>Para clínicas e empresas de serviços que querem conectar captação, atendimento e acompanhamento — com menos tarefas manuais.</p>
-      <a className="button" href="/digital-check">Fazer diagnóstico gratuito <ArrowIcon /></a>
+      <a className="button" href="/digital-check">Enviar meu briefing <ArrowIcon /></a>
       <a className="hero-secondary" href="#contato">Conversar sobre um projeto</a>
       <p className="hero-motto">Durma enquanto as ferramentas trabalham.</p>
     </div>

@@ -20,3 +20,7 @@ Verificação concluída: build completo, typecheck e regressão local passaram;
 ## Atualização de posicionamento comercial
 
 Removidos os planos de CRM e todos os valores públicos da página inicial e das páginas de serviços. A navegação agora leva à consultoria, que explica o diagnóstico da operação, a definição de prioridades e a proposta sob medida. O CRM apresenta recursos e usos, sem pacotes comerciais. Investimentos são apresentados na consultoria.
+
+## Captação sem CRM — 3 de outubro de 2026
+
+Formulário conectado ao Formspree mdekqoqo, com confirmação de recebimento antes de redirecionar para /obrigado, validação, prevenção de envio simultâneo, proteção antispam e recuperação de erro. A rota /digital-check apresenta o briefing simples; o questionário e as APIs anteriores são preservados para evolução futura, mas não fazem parte do fluxo público. Privacidade e CTAs refletem a análise manual. /obrigado não aparece no sitemap e tem noindex.

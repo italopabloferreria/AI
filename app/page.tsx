@@ -2,7 +2,7 @@
 
 import { ArrowIcon } from './arrow-icon';
 import { useEffect, useState } from 'react';
-import { DiagnosticEntry } from './diagnostic-entry';
+import { BriefingPage, ThankYouPage } from './contact-briefing';
 import { PrivacyPage, PublicPage, publicPages } from './public-pages';
 import Hero from './hero';
 import { Enhancements } from './interactions';
@@ -15,9 +15,10 @@ export default function Home({initialPath='/'}:{initialPath?:string}) {
   const [hashCheck,setHashCheck]=useState(false);
   useEffect(()=>{const listener=(event:MouseEvent)=>{const link=(event.target as Element)?.closest?.('a'); const href=link?.getAttribute('href')||''; const channel=href.startsWith('https://wa.me/')?'whatsapp':href.startsWith('mailto:')?'email':href.startsWith('tel:')?'phone':href==='/digital-check'?'diagnostic':null;if(channel)emitSiteEvent('cta_click',{channel});};document.addEventListener('click',listener);return()=>document.removeEventListener('click',listener);},[]);
   useEffect(()=>{if(window.location.hash==='#digital-check') setHashCheck(true);},[]);
+  if(initialPath === '/obrigado') return <ThankYouPage />;
   if(initialPath === '/privacidade') return <PrivacyPage />;
   if(initialPath in publicPages) return <PublicPage path={initialPath as keyof typeof publicPages} />;
-  if(initialPath === '/digital-check' || hashCheck) return <DiagnosticEntry />;
+  if(initialPath === '/digital-check' || hashCheck) return <BriefingPage />;
   if(!['/','/index.html'].includes(initialPath)) return <NotFound />;
   return (
     <main id="inicio">
