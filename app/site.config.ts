@@ -1,5 +1,5 @@
 export const config={
-contact:{email:'italopablo01@gmail.com',whatsapp:'+5561982274344',phoneLabel:'+55 61 98227-4344'},
+contact:{whatsapp:'+5561982274344'},
 siteUrl:'https://www.icbai.tech',
 nav:[['Serviços','servicos'],['Clínicas','solucoes'],['CRM','crm'],['Consultoria','consultoria'],['Dúvidas','faq'],['Sobre','sobre']],
 pillars:[['Construir','Uma presença que abre portas. Sistemas que sustentam o próximo passo.','Sites / Landing pages / E-commerce / Sistemas'],['Automatizar','O trabalho repetitivo sai da sua agenda. E entra em um fluxo que funciona.','Automações / Integrações / APIs / Workflows'],['Inteligência','Inteligência artificial aplicada a problemas reais. Sem espetáculo vazio.','IA / Agentes / Assistentes / Análise'],['Operar','Colocar no ar é o começo. A operação precisa continuar funcionando.','CRM / Suporte / Manutenção / Monitoramento']],
