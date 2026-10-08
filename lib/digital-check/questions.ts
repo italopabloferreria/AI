@@ -122,7 +122,7 @@ export const DIGITAL_CHECK_QUESTIONS: QuestionDefinition[] = [
     key: 'system_integration',
     type: 'single',
     question: 'Suas ferramentas conversam entre si?',
-    description: 'Exemplo: site → WhatsApp → CRM → agenda → financeiro.',
+    description: 'Exemplo: conecte site, WhatsApp, CRM, agenda e financeiro.',
     options: [
       { value: 'most_integrated', label: 'Sim, a maior parte é integrada' },
       { value: 'some_integrated', label: 'Algumas coisas são integradas' },

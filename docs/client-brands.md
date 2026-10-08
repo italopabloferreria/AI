@@ -1,6 +1,6 @@
 # Marcas e conexões
 
-Seção entre Sobre e perguntas frequentes. Grade centralizada e responsiva, fundo carbon do site e logos monocromáticos com cores originais no hover. Sem animação contínua.
+Seção entre Sobre e perguntas frequentes. Duas faixas contínuas em sentidos opostos, logos maiores, fundo carbon do site e cores originais no hover. A lista é dividida automaticamente entre as faixas; cópias decorativas ficam ocultas dos leitores de tela. O movimento pausa ao passar o cursor e pelo controle de pausa. Com movimento reduzido, os logos aparecem em uma grade estática.
 
 Para adicionar uma marca, copie o arquivo oficial para `public/clients/` e acrescente `{name:'Empresa',logo:'/clients/empresa.svg'}` à lista em `app/client-brands.tsx`. A ordem da lista define a ordem da grade. Sem arquivo, aparece o nome. `caption` permite exibir um nome junto a um símbolo, como Twovortex.
 

@@ -588,7 +588,7 @@ export function DigitalCheckFlow({
         <footer className="dc-footer">
           {currentStepIndex > 0 ? (
             <button className="dc-back-btn" type="button" onClick={handleBack}>
-              ← Voltar
+              <ArrowIcon direction="left" /> Voltar
             </button>
           ) : (
             <div className="dc-footer-spacer" />

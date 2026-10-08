@@ -2,6 +2,7 @@
 import { useRef, useState } from 'react';
 import { requestWithTimeout } from '../lib/client-request';
 import { ContactLinks } from './contact-links';
+import { ArrowIcon } from './arrow-icon';
 const endpoint='https://formspree.io/f/mdekqoqo';
 export function ContactBriefing() {
   const [loading,setLoading]=useState(false);
@@ -32,7 +33,7 @@ export function ContactBriefing() {
     <p className="fine">Seu briefing será recebido pela !AI para análise e contato. Não envie senhas, dados médicos ou informações sensíveis.</p>
     <label className="consent"><input type="checkbox" name="consent" value="Autorizo a análise do briefing e contato sobre minha solicitação" required/><span>Autorizo o uso das informações para analisar minha solicitação e entrar em contato. Li a <a href="/privacidade" target="_blank" rel="noopener noreferrer">Política de Privacidade (abre em nova aba)</a>.</span></label>
     {error&&<div className="form-error" role="alert"><p>{error}</p><ContactLinks/></div>}
-    <button className="button" type="submit" disabled={loading}>{loading?'Enviando…':'Enviar meu briefing'} ↗</button>
+    <button className="button" type="submit" disabled={loading}>{loading?'Enviando…':'Enviar meu briefing'} <ArrowIcon /></button>
     <p className="fine">Sem compromisso de contratação. A análise é feita pela !AI, sem resultado automático.</p>
   </form>;
 }

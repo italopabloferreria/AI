@@ -24,3 +24,5 @@ Removidos os planos de CRM e todos os valores públicos da página inicial e das
 ## Captação sem CRM — 3 de outubro de 2026
 
 Formulário conectado ao Formspree mdekqoqo, com confirmação de recebimento antes de redirecionar para /obrigado, validação, prevenção de envio simultâneo, proteção antispam e recuperação de erro. A rota /digital-check apresenta o briefing simples; o questionário e as APIs anteriores são preservados para evolução futura, mas não fazem parte do fluxo público. Privacidade e CTAs refletem a análise manual. /obrigado não aparece no sitemap e tem noindex.
+
+Regra visual: usar o componente ArrowIcon (SVG) para todas as setas da interface, inclusive botões de formulário, WhatsApp, voltar e rodapé. Não usar caracteres Unicode como ícones. O padrão vale para desktop e mobile.

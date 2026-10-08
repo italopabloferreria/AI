@@ -1,8 +1,9 @@
-type ArrowDirection = 'up-right' | 'right' | 'down' | 'up';
+type ArrowDirection = 'up-right' | 'right' | 'left' | 'down' | 'up';
 
 const paths: Record<ArrowDirection, string> = {
   'up-right': 'M5 19 19 5M5 5h14v14',
   right: 'M4 12h16m-7-7 7 7-7 7',
+  left: 'M20 12H4m7-7-7 7 7 7',
   down: 'M12 4v16m-7-7 7 7 7-7',
   up: 'M12 20V4m-7 7 7-7 7 7',
 };
