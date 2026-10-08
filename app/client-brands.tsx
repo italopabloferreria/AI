@@ -2,7 +2,7 @@ import {useState} from 'react';
 
 // Add official artwork to public/clients/ and an entry to this list.
 export const clientBrands: {name:string;logo?:string;detail?:string;caption?:string}[] = [
-  {name:'VCompany'},
+  {name:'VCompany',logo:'/clients/vcompany.svg'},
   {name:'Cardiofitness',logo:'/clients/cardiofitness.jpeg'},
   {name:'Rita Trindade',logo:'/clients/rita-trindade.png'},
   {name:'Limpax',logo:'/clients/limpax.png'},
