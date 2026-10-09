@@ -9,6 +9,7 @@ Fontes dos arquivos:
 - UnB: https://marca.unb.br/marca.php (assinatura básica horizontal).
 - Cardiofitness: https://cardiofitness.com.br/wp-content/uploads/2023/08/logo_cardiofitness-extendida.png, vetorizada em curvas SVG (símbolo e letras, sem imagem incorporada). Variante para fundo escuro com nome claro e símbolo no azul original; cinza no repouso e azul no hover, preservando a leitura. A assinatura horizontal ocupa a largura disponível do item.
 - Limpax e Seidler: arquivos dos projetos locais.
+- Host Only Tecnologia: PNG transparente fornecido por Ítalo; preservados desenho, nome e gradiente azul/ciano original.
 - Turma da Ritinha, Instituto Rita Trindade, Rita Trindade, Método Hálito Blindado e Twovortex: imagens fornecidas por Ítalo, com fundo removido pela ferramenta nativa de edição de imagem. Prompt: remover somente fundo e preservar desenho, texto e cores.
 
 Alpha Clinic Vital aparece como nome até a inclusão do arquivo oficial.

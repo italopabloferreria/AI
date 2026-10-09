@@ -13,6 +13,7 @@ export const clientBrands: {name:string;logo?:string;detail?:string;caption?:str
   {name:'Turma da Ritinha',logo:'/clients/ritinha.png'},
   {name:'Método Hálito Blindado',logo:'/clients/halito-blindado.png'},
   {name:'Twovortex',logo:'/clients/twovortex.png',caption:'TWOVORTEX'},
+  {name:'Host Only Tecnologia',logo:'/clients/host-only.png'},
 ];
 export default function ClientBrands(){const [paused,setPaused]=useState(false);const midpoint=Math.ceil(clientBrands.length/2);return <section className="client-brands" aria-labelledby="client-brands-title">
   <div className="wrap"><div className="client-brands-heading"><div className="eyebrow">MARCAS & CONEXÕES</div><h2 id="client-brands-title">Boas conexões.<br/><span>Novas possibilidades.</span></h2><p>Tecnologia encontra pessoas. Ideias encontram caminho.</p></div>
